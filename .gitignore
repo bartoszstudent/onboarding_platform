@@ -1,0 +1,60 @@
+# System
+.DS_Store
+*.log
+*.swp
+
+# IDEs
+*.iml
+*.ipr
+*.iws
+.idea/
+# Uncomment if you don't want to commit VSCode workspace settings:
+.vscode/
+
+# Flutter / Dart / Pub
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+# NOTE: dla aplikacji Flutter zwykle commitujemy pubspec.lock — NIE ignoruj go
+# pubspec.lock
+
+# Build / outputs
+/build/
+/coverage/
+
+# iOS
+ios/Pods/
+ios/Runner.xcworkspace/
+ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+**/ios/Flutter/.last_build_id
+
+# Android
+/android/.gradle/
+/android/app/**/build
+android/local.properties
+
+# Gradle
+.gradle/
+
+# Files that may contain keys/secrets (don't commit)
+*.jks
+*.keystore
+key.properties
+*.p12
+*.p8
+*.json     # jeśli zawiera credentials (np. service account) — rozważ specyficzne ignorowanie np. secret-*.json
+
+# Flutter related IDE / caches / misc
+.idea/
+.history
+.migrate_working_dir/
+
+# Optional: lockfiles / caches you may want to ignore across dev machines
+.pub/
+
+# Optional: generated symbol/obfuscation files
+app.*.symbols
+app.*.map.json
