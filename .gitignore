@@ -20,6 +20,11 @@
 # NOTE: dla aplikacji Flutter zwykle commitujemy pubspec.lock — NIE ignoruj go
 # pubspec.lock
 
+# Python / Django
+backend/venv/
+backend/__pycache__/
+backend/*.sqlite3
+
 # Build / outputs
 /build/
 /coverage/
