@@ -7,3 +7,4 @@ pytz==2025.2
 setuptools==65.5.0
 sqlparse==0.5.3
 tzdata==2025.2
+django-cors-headers==4.9.0
