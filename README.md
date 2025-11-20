@@ -18,7 +18,10 @@ samples, guidance on mobile development, and a full API reference.
 Aby uruchomić backend:
 
 cd backend
+
 python - -m venv venv
+
 .\venv\Scripts\activate
+
 pip install -r requirements.txt
 
