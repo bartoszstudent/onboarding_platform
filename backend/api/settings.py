@@ -74,10 +74,19 @@ WSGI_APPLICATION = 'api.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'mssql',
+        'NAME': 'ProjektZespołowy',
+        'USER': 'adminprojekt',
+        'PASSWORD': 'Zespołowy2025',
+        'HOST': 'tcp:projekt-zespolowy.database.windows.net',
+        'PORT': '',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 18 for SQL Server',
+            'extra_params': 'Encrypt=yes;TrustServerCertificate=no;',
+        },
     }
 }
+
 
 
 # Password validation
