@@ -29,6 +29,18 @@ backend/*.sqlite3
 /build/
 /coverage/
 
+# React / Node
+# Ignore node modules and common React build artifacts
+node_modules/
+**/node_modules/
+
+# If you have a React source folder in the repo (e.g. frontend/react_source)
+frontend/react_source/node_modules/
+frontend/react_source/build/
+frontend/react_source/dist/
+frontend/react_source/.cache/
+frontend/react_source/.env
+
 # iOS
 ios/Pods/
 ios/Runner.xcworkspace/

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'routes/app_router.dart';
+import 'core/theme/app_theme.dart';
 
 class OnboardlyApp extends StatelessWidget {
   const OnboardlyApp({super.key});
@@ -9,13 +10,7 @@ class OnboardlyApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'Onboardly',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueAccent),
-        useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-        ),
-      ),
+      theme: AppTheme.lightTheme,
       routerConfig: AppRouter.router,
     );
   }
