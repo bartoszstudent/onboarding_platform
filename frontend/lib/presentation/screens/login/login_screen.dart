@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/services/auth_service.dart';
+import '../../ui/input.dart';
+import '../../ui/app_button.dart';
+import '../../ui/app_card.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,10 +33,13 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordController.text,
     );
 
+    if (!mounted) return;
+
     setState(() => _isLoading = false);
 
     if (success) {
-      if (mounted) context.go('/dashboard');
+      // Po zalogowaniu przechodzimy bezpośrednio do dashboardu
+      context.go('/dashboard');
     } else {
       setState(() => _error = "Nieprawidłowy email lub hasło");
     }
@@ -45,65 +51,54 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Center(
         child: SizedBox(
           width: 400,
-          child: Card(
-            elevation: 8,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      "Onboardly",
-                      style: Theme.of(context).textTheme.headlineMedium,
+          child: AppCard(
+            padding: const EdgeInsets.all(24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "Onboardly",
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 20),
+                  AppInput(
+                    controller: _emailController,
+                    labelText: 'Email',
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Podaj email';
+                      if (!value.contains('@')) {
+                        return 'Nieprawidłowy format emaila';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  AppInput(
+                    controller: _passwordController,
+                    labelText: 'Hasło',
+                    obscureText: true,
+                    validator: (value) {
+                      if (value == null || value.length < 6) {
+                        return 'Hasło musi mieć min. 6 znaków';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  if (_error != null)
+                    Text(_error!, style: const TextStyle(color: Colors.red)),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: AppButton(
+                      onPressed: _isLoading ? () {} : _login,
+                      label: _isLoading ? 'Ładowanie...' : 'Zaloguj się',
+                      primary: true,
                     ),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      controller: _emailController,
-                      decoration: const InputDecoration(labelText: "Email"),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return "Podaj email";
-                        }
-                        if (!value.contains('@')) {
-                          return "Nieprawidłowy format emaila";
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordController,
-                      decoration: const InputDecoration(labelText: "Hasło"),
-                      obscureText: true,
-                      validator: (value) {
-                        if (value == null || value.length < 6) {
-                          return "Hasło musi mieć min. 6 znaków";
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    if (_error != null)
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _login,
-                        child: _isLoading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                              )
-                            : const Text("Zaloguj się"),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
