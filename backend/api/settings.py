@@ -133,6 +133,4 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOWED_ORIGINS =[
-    "http://localhost:xxxx"  #xxxx=port na którym jest uruchomiony flutter
-]
+CORS_ALLOW_ALL_ORIGINS = True
