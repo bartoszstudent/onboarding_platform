@@ -76,4 +76,4 @@ key.properties
 app.*.symbols
 app.*.map.json
 
-frontend/build/*
+/frontend/build/
