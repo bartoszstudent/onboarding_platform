@@ -77,3 +77,16 @@ app.*.symbols
 app.*.map.json
 
 frontend/build/
+
+frontend/android/local.properties
+frontend/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+frontend/build/flutter_assets/AssetManifest.json
+frontend/build/flutter_assets/NOTICES
+frontend/build/flutter_assets/shaders/ink_sparkle.frag
+frontend/linux/flutter/generated_plugin_registrant.cc
+frontend/linux/flutter/generated_plugin_registrant.h
+frontend/linux/flutter/generated_plugins.cmake
+frontend/macos/Flutter/GeneratedPluginRegistrant.swift
+frontend/windows/flutter/generated_plugin_registrant.cc
+frontend/windows/flutter/generated_plugin_registrant.h
+frontend/windows/flutter/generated_plugins.cmake
