@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../ui/app_card.dart';
 import '../../../core/constants/design_tokens.dart';
-import '../../../core/constants/design_tokens.dart';
 import 'widgets/add_company_screen.dart';
-
+import 'widgets/manage_company_screen.dart';
 
 class _HoverableListItem extends StatelessWidget {
   final VoidCallback? onTap;
@@ -23,7 +22,6 @@ class _HoverableListItem extends StatelessWidget {
   }
 }
 
-
 class CompanyManagementScreen extends StatefulWidget {
   const CompanyManagementScreen({super.key});
 
@@ -39,7 +37,7 @@ class _CompanyManagementScreenState extends State<CompanyManagementScreen> {
   bool _showManage = false;
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  
+
   Map<String, dynamic>? _selectedCompany;
 
   final List<Map<String, dynamic>> _companies = [
@@ -388,7 +386,7 @@ class _CompanyManagementScreenState extends State<CompanyManagementScreen> {
         // ---- MODAL AddCompanyModal ----
         if (_showAdd)
           AddCompanyModal(
-            formKey: _formKey, // <-- dodany wymagany argument
+            formKey: _formKey,
             newCompany: {
               "name": "",
               "subdomain": "",
@@ -412,6 +410,13 @@ class _CompanyManagementScreenState extends State<CompanyManagementScreen> {
                 setState(() => _showAdd = false);
               }
             },
+          ),
+
+        // ---- MODAL ManageCompanyModal ----
+        if (_showManage && _selectedCompany != null)
+          ManageCompanyModal(
+            selectedCompany: _selectedCompany!,
+            onClose: () => setState(() => _showManage = false),
           ),
       ],
     );
