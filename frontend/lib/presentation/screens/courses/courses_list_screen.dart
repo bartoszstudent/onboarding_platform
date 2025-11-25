@@ -1,19 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/constants/design_tokens.dart';
+import '../../../data/services/auth_service.dart';
 import '../../ui/badge.dart' as app_ui;
 import 'course_mock_data.dart';
 import 'course_player_screen.dart';
 import 'course_create_screen.dart';
 import 'widgets/course_card.dart';
 
-class CoursesListScreen extends StatelessWidget {
-  final String role; // np. "admin", "hr", "employee"
-  const CoursesListScreen({super.key, required this.role});
+class CoursesListScreen extends StatefulWidget {
+  final String? role; // np. "admin", "hr", "employee"
+  const CoursesListScreen({super.key, this.role});
+
+  @override
+  State<CoursesListScreen> createState() => _CoursesListScreenState();
+}
+
+class _CoursesListScreenState extends State<CoursesListScreen> {
+  String? _role;
+
+  @override
+  void initState() {
+    super.initState();
+    _role = widget.role;
+    if (_role == null) {
+      _loadRole();
+    }
+  }
+
+  Future<void> _loadRole() async {
+    final role = await AuthService.getRole();
+    if (!mounted) return;
+    setState(() {
+      _role = role ?? 'employee';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final courses = mockCourses;
+
+    final role = _role ?? 'employee';
 
     return Scaffold(
       appBar: AppBar(
