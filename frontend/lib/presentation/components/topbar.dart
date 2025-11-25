@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import '../components/user_avatar.dart';
 import '../../core/constants/design_tokens.dart';
+import '../../data/services/auth_service.dart';
 
 class Topbar extends StatelessWidget {
   const Topbar({super.key});
@@ -67,7 +69,13 @@ class Topbar extends StatelessWidget {
               const PopupMenuItem(value: 1, child: Text('Profil')),
               const PopupMenuItem(value: 2, child: Text('Wyloguj')),
             ],
-            onSelected: (v) {},
+            onSelected: (v) async {
+              if (v == 2) {
+                await AuthService.logout();
+                if (!context.mounted) return;
+                GoRouter.of(context).go('/');
+              }
+            },
           ),
         ],
       ),

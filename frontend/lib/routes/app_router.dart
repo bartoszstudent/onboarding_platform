@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../presentation/screens/login/login_screen.dart';
+// using new login screen implementation; keep old filename untouched
+import '../presentation/screens/login/login_screen_new.dart';
 import '../presentation/screens/dashboard/dashboard_screen.dart';
 import '../presentation/layouts/main_layout.dart';
 import '../presentation/screens/courses/courses_list_screen.dart';
@@ -12,7 +13,7 @@ class AppRouter {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) => const LoginScreenNew(),
       ),
       ShellRoute(
         builder: (context, state, child) => MainLayout(child: child),
