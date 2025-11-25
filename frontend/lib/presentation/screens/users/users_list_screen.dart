@@ -6,6 +6,8 @@ import '../../ui/avatar.dart';
 import '../../ui/badge.dart' as ui_badge;
 import 'widgets/add_user_screen.dart';
 import 'widgets/edit_user_screen.dart';
+import 'widgets/assign_courses_screen.dart';
+
 
 class UsersListScreen extends StatefulWidget {
   const UsersListScreen({super.key});
@@ -17,7 +19,6 @@ class UsersListScreen extends StatefulWidget {
 class _UsersListScreenState extends State<UsersListScreen> {
   String _search = '';
   String _roleFilter = '';
-  bool _showAdd = false;
 
   final List<Map<String, dynamic>> _users = [
     {
@@ -288,8 +289,15 @@ class _UsersListScreenState extends State<UsersListScreen> {
                                 ),
                                 const SizedBox(width: 6),
                                 TextButton(
-                                    onPressed: () {},
-                                    child: const Text('Przypisz kursy')),
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: true,
+                                      builder: (_) => AssignCoursesScreen(user: u),
+                                    );
+                                  },
+                                  child: const Text('Przypisz kursy'),
+                                ),
                                 IconButton(
                                     onPressed: () {},
                                     icon: SvgPicture.asset(

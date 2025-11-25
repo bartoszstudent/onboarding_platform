@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/constants/design_tokens.dart';
 import '../../../ui/input.dart';
 import '../../../ui/dropdown_menu.dart';
@@ -170,7 +169,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
 
                   const SizedBox(height: 18),
 
-                  // Akcje
+                  // Actions
                   Row(
                     children: [
                       Expanded(

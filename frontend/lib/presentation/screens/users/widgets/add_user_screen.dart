@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/constants/design_tokens.dart';
 import '../../../ui/input.dart';
 import '../../../ui/dropdown_menu.dart';
