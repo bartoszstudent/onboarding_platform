@@ -5,7 +5,7 @@ import '../../../core/constants/design_tokens.dart';
 import '../../ui/avatar.dart';
 import '../../ui/badge.dart' as ui_badge;
 import 'widgets/add_user_screen.dart';
-
+import 'widgets/edit_user_screen.dart';
 
 class UsersListScreen extends StatefulWidget {
   const UsersListScreen({super.key});
@@ -277,8 +277,15 @@ class _UsersListScreenState extends State<UsersListScreen> {
                             child: Row(
                               children: [
                                 TextButton(
-                                    onPressed: () {},
-                                    child: const Text('Edytuj')),
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: true,
+                                      builder: (_) => EditUserScreen(user: u), 
+                                    );
+                                  },
+                                  child: const Text('Edytuj'),
+                                ),
                                 const SizedBox(width: 6),
                                 TextButton(
                                     onPressed: () {},
