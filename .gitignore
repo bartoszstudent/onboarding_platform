@@ -12,6 +12,99 @@
 .vscode/
 
 # Flutter / Dart / Pub
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+# NOTE: dla aplikacji Flutter zwykle commitujemy pubspec.lock — NIE ignoruj go
+# pubspec.lock
+
+# Python / Django
+backend/venv/
+backend/__pycache__/
+backend/*.sqlite3
+backend/api/__pycache__/
+
+# Build / outputs
+/build/
+/coverage/
+
+# React / Node
+# Ignore node modules and common React build artifacts
+node_modules/
+**/node_modules/
+
+# If you have a React source folder in the repo (e.g. frontend/react_source)
+frontend/react_source/node_modules/
+frontend/react_source/build/
+frontend/react_source/dist/
+frontend/react_source/.cache/
+frontend/react_source/.env
+
+# iOS
+ios/Pods/
+ios/Runner.xcworkspace/
+ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+**/ios/Flutter/.last_build_id
+
+# Android
+/android/.gradle/
+/android/app/**/build
+android/local.properties
+
+# Gradle
+.gradle/
+
+# Files that may contain keys/secrets (don't commit)
+*.jks
+*.keystore
+key.properties
+*.p12
+*.p8
+*.json     # jeśli zawiera credentials (np. service account) — rozważ specyficzne ignorowanie np. secret-*.json
+
+# Flutter related IDE / caches / misc
+.idea/
+.history
+.migrate_working_dir/
+
+# Optional: lockfiles / caches you may want to ignore across dev machines
+.pub/
+
+# Optional: generated symbol/obfuscation files
+app.*.symbols
+app.*.map.json
+
+frontend/build/
+
+frontend/android/local.properties
+frontend/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+frontend/build/flutter_assets/AssetManifest.json
+frontend/build/flutter_assets/NOTICES
+frontend/build/flutter_assets/shaders/ink_sparkle.frag
+frontend/linux/flutter/generated_plugin_registrant.cc
+frontend/linux/flutter/generated_plugin_registrant.h
+frontend/linux/flutter/generated_plugins.cmake
+frontend/macos/Flutter/GeneratedPluginRegistrant.swift
+frontend/windows/flutter/generated_plugin_registrant.cc
+frontend/windows/flutter/generated_plugin_registrant.h
+frontend/windows/flutter/generated_plugins.cmake
+# System
+.DS_Store
+*.log
+*.swp
+
+# IDEs
+*.iml
+*.ipr
+*.iws
+.idea/
+# Uncomment if you don't want to commit VSCode workspace settings:
+.vscode/
+
+# Flutter / Dart / Pub
 frontend/.dart_tool/
 frontend/.packages
 frontend/.flutter-plugins
