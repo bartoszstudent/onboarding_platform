@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/design_tokens.dart';
+import '../../data/services/auth_service.dart';
 
 class Sidebar extends StatefulWidget {
   const Sidebar({super.key});
@@ -13,21 +14,46 @@ class Sidebar extends StatefulWidget {
 class _SidebarState extends State<Sidebar> {
   bool get _isCollapsed => MediaQuery.of(context).size.width < 900;
 
-  final List<_MenuItem> _items = const [
-    _MenuItem(
-        path: '/dashboard', asset: 'assets/icons/home.svg', label: 'Dashboard'),
-    _MenuItem(
-        path: '/courses', asset: 'assets/icons/book-open.svg', label: 'Kursy'),
-    _MenuItem(
-        path: '/users', asset: 'assets/icons/users.svg', label: 'Użytkownicy'),
-    _MenuItem(
-        path: '/settings',
-        asset: 'assets/icons/settings.svg',
-        label: 'Ustawienia'),
-  ];
+  String? _role;
+
+  List<_MenuItem> get _items {
+    final base = [
+      const _MenuItem(
+          path: '/dashboard',
+          asset: 'assets/icons/home.svg',
+          label: 'Dashboard'),
+      const _MenuItem(
+          path: '/courses',
+          asset: 'assets/icons/book-open.svg',
+          label: 'Kursy'),
+    ];
+
+    // hide users/settings for super_admins (they manage companies elsewhere)
+    if (_role != 'super_admin') {
+      base.add(const _MenuItem(
+          path: '/users',
+          asset: 'assets/icons/users.svg',
+          label: 'Użytkownicy'));
+      base.add(const _MenuItem(
+          path: '/settings',
+          asset: 'assets/icons/settings.svg',
+          label: 'Ustawienia'));
+    }
+
+    return base;
+  }
 
   @override
   Widget build(BuildContext context) {
+    // ensure we have the role loaded
+    if (_role == null) {
+      AuthService.getRole().then((r) {
+        if (!mounted) return;
+        setState(() {
+          _role = r ?? 'employee';
+        });
+      });
+    }
     final location = GoRouter.of(context).location;
 
     return AnimatedContainer(
