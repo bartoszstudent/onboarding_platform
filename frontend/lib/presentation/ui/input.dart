@@ -25,8 +25,11 @@ class AppInput extends StatelessWidget {
         // Prefer showing a stationary placeholder. If a labelText was
         // provided, we keep it as hintText and disable the floating label
         // behaviour so the placeholder does not animate upwards on focus.
-        labelText: labelText,
+        // We prefer labels displayed above the field; keep labelText optional.
+        // Always show hintText with a stable color so it doesn't change on focus.
+        labelText: null,
         hintText: hintText ?? labelText,
+        hintStyle: TextStyle(color: Colors.grey[600]),
         floatingLabelBehavior: FloatingLabelBehavior.never,
         filled: true,
         fillColor: Colors.grey.shade100,

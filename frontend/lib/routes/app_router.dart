@@ -13,7 +13,7 @@ class AppRouter {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) => const LoginScreenNew(),
       ),
       ShellRoute(
         builder: (context, state, child) => MainLayout(child: child),
