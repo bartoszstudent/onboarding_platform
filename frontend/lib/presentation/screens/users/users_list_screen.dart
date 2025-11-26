@@ -4,6 +4,10 @@ import '../../ui/app_card.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../ui/avatar.dart';
 import '../../ui/badge.dart' as ui_badge;
+import 'widgets/add_user_screen.dart';
+import 'widgets/edit_user_screen.dart';
+import 'widgets/assign_courses_screen.dart';
+
 
 class UsersListScreen extends StatefulWidget {
   const UsersListScreen({super.key});
@@ -15,7 +19,6 @@ class UsersListScreen extends StatefulWidget {
 class _UsersListScreenState extends State<UsersListScreen> {
   String _search = '';
   String _roleFilter = '';
-  bool _showAdd = false;
 
   final List<Map<String, dynamic>> _users = [
     {
@@ -98,7 +101,13 @@ class _UsersListScreenState extends State<UsersListScreen> {
                 ],
               ),
               ElevatedButton.icon(
-                onPressed: () => setState(() => _showAdd = true),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: true,
+                    builder: (_) => const AddUserScreen(),
+                  );
+                },
                 icon: SvgPicture.asset('assets/icons/plus.svg',
                     width: 18, height: 18, color: Colors.white),
                 label: const Text('Dodaj użytkownika'),
@@ -269,12 +278,26 @@ class _UsersListScreenState extends State<UsersListScreen> {
                             child: Row(
                               children: [
                                 TextButton(
-                                    onPressed: () {},
-                                    child: const Text('Edytuj')),
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: true,
+                                      builder: (_) => EditUserScreen(user: u), 
+                                    );
+                                  },
+                                  child: const Text('Edytuj'),
+                                ),
                                 const SizedBox(width: 6),
                                 TextButton(
-                                    onPressed: () {},
-                                    child: const Text('Przypisz kursy')),
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: true,
+                                      builder: (_) => AssignCoursesScreen(user: u),
+                                    );
+                                  },
+                                  child: const Text('Przypisz kursy'),
+                                ),
                                 IconButton(
                                     onPressed: () {},
                                     icon: SvgPicture.asset(
@@ -292,58 +315,6 @@ class _UsersListScreenState extends State<UsersListScreen> {
               ],
             ),
           ),
-
-          // Add User Modal
-          if (_showAdd)
-            Center(
-              child: Dialog(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Dodaj nowego użytkownika',
-                          style: Theme.of(context).textTheme.titleLarge),
-                      const SizedBox(height: 12),
-                      const TextField(
-                          decoration: InputDecoration(
-                              labelText: 'Imię i nazwisko')),
-                      const SizedBox(height: 8),
-                      const TextField(
-                          decoration:
-                              InputDecoration(labelText: 'Email')),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'employee', child: Text('Pracownik')),
-                          DropdownMenuItem(value: 'hr', child: Text('HR')),
-                          DropdownMenuItem(
-                              value: 'admin', child: Text('Administrator')),
-                        ],
-                        onChanged: (_) {},
-                        decoration: const InputDecoration(labelText: 'Rola'),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                              child: TextButton(
-                                  onPressed: () =>
-                                      setState(() => _showAdd = false),
-                                  child: const Text('Anuluj'))),
-                          Expanded(
-                              child: ElevatedButton(
-                                  onPressed: () =>
-                                      setState(() => _showAdd = false),
-                                  child: const Text('Dodaj użytkownika'))),
-                        ],
-                      )
-                    ],
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
