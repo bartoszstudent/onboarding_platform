@@ -64,11 +64,11 @@ class _AppButtonState extends State<AppButton> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                     horizontal: Tokens.spacing, vertical: 12),
-                //child: DefaultTextStyle(
-                  //style:
-                      //GoogleFonts.inter(fontWeight: FontWeight.w600, color: fg),
-                  //child: Text(widget.label),
-                //),
+                child: DefaultTextStyle(
+                  style:
+                      GoogleFonts.inter(fontWeight: FontWeight.w600, color: fg),
+                  child: Text(widget.label),
+                ),
               ),
             ),
           ),
