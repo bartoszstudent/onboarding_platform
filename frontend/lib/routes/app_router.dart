@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-// using new login screen implementation; keep old filename untouched
-import '../presentation/screens/login/login_screen_new.dart';
+import 'package:onboarding_frontend/presentation/screens/companies/companies_list_screen.dart';
+import '../presentation/screens/login/login_screen.dart';
 import '../presentation/screens/dashboard/dashboard_screen.dart';
 import '../presentation/layouts/main_layout.dart';
 import '../presentation/screens/courses/courses_list_screen.dart';
@@ -37,9 +37,9 @@ class AppRouter {
                 body: Center(child: Text('Ustawienia - placeholder'))),
           ),
           GoRoute(
-            path: '/admin/companies',
-            builder: (context, state) => const Scaffold(
-                body: Center(child: Text('Zarządzanie firmami - placeholder'))),
+            path: '/companies',
+            builder: (context, state) => const CompanyManagementScreen(),
+                //body: Center(child: Text('Zarządzanie firmami - placeholder'))),
           ),
         ],
       ),
