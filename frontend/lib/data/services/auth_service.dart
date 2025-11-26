@@ -1,61 +1,108 @@
 import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../core/utils/token_manager.dart';
+import '../models/user_model.dart';
+import 'api_client.dart';
 
 class AuthService {
-  // Demo users shown in `login_screen_new.dart` (all use password '123123')
-  static const Map<String, String> _demoUsers = {
-    'superadmin@test.com': 'super_admin',
-    'admin@test.com': 'company_admin',
-    'hr@test.com': 'hr',
-    'employee@test.com': 'employee',
-  };
+  static const String _userKey = 'auth_user';
 
+  /// Logowanie do backendu.
+  ///
+  /// Wysyła POST na endpoint Django:
+  ///   POST /api/login/
+  /// z body:
+  ///   { "email": "...", "password": "..." }
+  ///
+  /// Oczekuje odpowiedzi:
+  /// {
+  ///   "token": "<string>",
+  ///   "user": {
+  ///     "id": 1,
+  ///     "email": "user@example.com",
+  ///     "first_name": "Jan",
+  ///     "last_name": "Kowalski",
+  ///     "username": "jan",
+  ///     "role": "admin"
+  ///   }
+  /// }
   static Future<bool> login(String email, String password) async {
-    // simulate API latency (mock)
-    await Future.delayed(const Duration(seconds: 1));
-
-    // Accept demo users with a single shared password '123123'
-    final role = _demoUsers[email];
-    if (role != null && password == '123123') {
-      final payload = base64Url.encode(utf8.encode(jsonEncode({'role': role})));
-      final token = 'header.$payload.signature';
-      await TokenManager.saveToken(token);
-      return true;
-    }
-
-    // Keep backward-compatible hardcoded check (optional)
-    if (email == 'admin@onboardly.com' && password == 'admin123') {
-      final payload = base64Url.encode(
-        utf8.encode(jsonEncode({'role': 'company_admin'})),
-      );
-      final token = 'header.$payload.signature';
-      await TokenManager.saveToken(token);
-      return true;
-    }
-
-    return false;
-  }
-
-  static Future<String?> getRole() async {
-    final token = await TokenManager.getToken();
-    if (token == null) return null;
     try {
-      final parts = token.split('.');
-      if (parts.length < 2) return null;
-      final payload = utf8.decode(base64Url.decode(parts[1]));
-      final map = jsonDecode(payload);
-      return map['role'] as String?;
-    } catch (e) {
-      return null;
+      final response = await ApiClient.post(
+        'api/login/', // <-- ścieżka do Twojego Django
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        // Możesz tu sparsować response.body i zwrócić bardziej szczegółowy błąd
+        return false;
+      }
+
+      final Map<String, dynamic> decoded =
+          jsonDecode(response.body) as Map<String, dynamic>;
+
+      final token = decoded['token']?.toString();
+      final userMap = decoded['user'] as Map<String, dynamic>?;
+
+      if (token == null || userMap == null) {
+        return false;
+      }
+
+      final user = UserModel.fromJson(userMap);
+
+      // Zapis tokena
+      await TokenManager.saveToken(token);
+
+      // Zapis użytkownika w SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_userKey, jsonEncode(user.toJson()));
+
+      return true;
+    } catch (_) {
+      // W razie błędu sieci / parsowania traktujemy jako nieudane logowanie
+      return false;
     }
   }
 
+  /// Sprawdza, czy mamy zapisany token.
   static Future<bool> isLoggedIn() async {
     final token = await TokenManager.getToken();
     return token != null;
   }
 
+  /// Zwraca aktualnie zalogowanego użytkownika (jeśli jest zapisany).
+  static Future<UserModel?> getCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_userKey);
+    if (raw == null) return null;
+
+    try {
+      final Map<String, dynamic> data =
+          jsonDecode(raw) as Map<String, dynamic>;
+      return UserModel.fromJson(data);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Zwraca rolę aktualnego użytkownika (np. "admin", "hr", "employee").
+  static Future<String?> getRole() async {
+    final user = await getCurrentUser();
+    return user?.role;
+  }
+
+  /// Wylogowuje użytkownika – usuwa token i dane usera.
   static Future<void> logout() async {
     await TokenManager.clearToken();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_userKey);
   }
 }

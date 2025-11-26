@@ -1,7 +1,7 @@
 import 'package:http/http.dart' as http;
 
 class ApiClient {
-  static const baseUrl = 'https://api.onboardly.app';
+ static const baseUrl = 'http://localhost:8000';
 
   static Future<http.Response> get(
     String endpoint, {
@@ -22,3 +22,4 @@ class ApiClient {
     );
   }
 }
+
