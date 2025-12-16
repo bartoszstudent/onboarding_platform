@@ -13,19 +13,38 @@ class MainLayout extends StatelessWidget {
         children: [
           const Sidebar(),
           Expanded(
-            child: Column(
+            child: Stack(
               children: [
-                const Topbar(),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    color: const Color(0xFFF8FAFC),
-                    child: child,
-                  ),
+                Column(
+                  children: [
+                    Topbar(),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        color: const Color(0xFFF8FAFC),
+                        child: child,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+
+          // Expanded(
+          //   child: Column(
+          //     children: [
+          //       Topbar(),
+          //       Expanded(
+          //         child: Container(
+          //           padding: const EdgeInsets.all(16),
+          //           color: const Color(0xFFF8FAFC),
+          //           child: child,
+          //         ),
+          //       ),
+          //     ],
+          //   ),
+          // ),
         ],
       ),
     );
