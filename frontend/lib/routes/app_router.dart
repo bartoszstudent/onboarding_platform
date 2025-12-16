@@ -6,6 +6,7 @@ import '../presentation/screens/dashboard/dashboard_screen.dart';
 import '../presentation/layouts/main_layout.dart';
 import '../presentation/screens/courses/courses_list_screen.dart';
 import '../presentation/screens/users/users_list_screen.dart';
+import '../presentation/screens/settings/settings_screen.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -33,8 +34,7 @@ class AppRouter {
           ),
           GoRoute(
             path: '/settings',
-            builder: (context, state) => const Scaffold(
-                body: Center(child: Text('Ustawienia - placeholder'))),
+            builder: (context, state) => const OnboardingSettingsScreen(),
           ),
           GoRoute(
             path: '/companies',
