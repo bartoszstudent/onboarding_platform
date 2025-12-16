@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../ui/app_button.dart';
 import '../../ui/app_card.dart';
 import '../../ui/input.dart';
-import '../../ui/checkbox.dart';
 import '../../ui/label.dart';
-import '../../ui/badge.dart' as ui_badge;
 import '../../ui/avatar.dart';
 import '../../../core/constants/design_tokens.dart';
 
@@ -617,53 +614,46 @@ class _OnboardingSettingsScreenState extends State<OnboardingSettingsScreen> {
                         cursor: SystemMouseCursors.basic,
                         child: StatefulBuilder(
                           builder: (context, setState) {
-                            bool hovered = false;
-
-                            return MouseRegion(
-                              onEnter: (_) => setState(() => hovered = true),
-                              onExit: (_) => setState(() => hovered = false),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 120),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: hovered ? Tokens.gray50 : Tokens.background,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: BoxDecoration(
-                                        color: success ? Tokens.green700 : Tokens.destructive,
-                                        shape: BoxShape.circle,
-                                      ),
+                            return Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Tokens.background, 
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: success ? Tokens.green700 : Tokens.destructive,
+                                      shape: BoxShape.circle,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          AppLabel(log['action'] as String),
-                                          AppLabel(
-                                            log['device'] as String,
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Tokens.textPrimary,
-                                            ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        AppLabel(log['action'] as String),
+                                        AppLabel(
+                                          log['device'] as String,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Tokens.textPrimary,
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
-                                    AppLabel(
-                                      log['time'] as String,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Tokens.textPrimary,
-                                      ),
+                                  ),
+                                  AppLabel(
+                                    log['time'] as String,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Tokens.textPrimary,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             );
                           },
