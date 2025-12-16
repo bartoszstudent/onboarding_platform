@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from core.views import login_view, CourseViewSet, UserAssignedCoursesViewSet, CourseAssignmentViewSet
+from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet, UserAssignedCoursesViewSet, CourseAssignmentViewSet
 
 # Create a router and register our viewsets with it.
 router = DefaultRouter()
@@ -17,4 +17,8 @@ urlpatterns = [
 
     # Custom URL for getting courses for a specific user
     path('api/users/<int:user_id>/courses/', UserAssignedCoursesViewSet.as_view({'get': 'list'}), name='user-courses'),
+    path('api/quizzes/<int:pk>/', QuizDetailView.as_view(), name='quiz-detail'),
+    
+    # URL to submit answers for a quiz
+    path('api/quizzes/<int:pk>/submit/', SubmitQuizView.as_view(), name='quiz-submit'),
 ]

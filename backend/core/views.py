@@ -11,6 +11,12 @@ from django.views.decorators.http import require_POST
 from rest_framework import viewsets, permissions
 from .models.training import Course, CourseAssignment
 from .serializers import CourseSerializer, CourseAssignmentSerializer
+from rest_framework import generics, views
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Quiz
+from .models import Answer
+from .serializers import QuizDetailSerializer
 
 User = get_user_model()
 
@@ -156,3 +162,46 @@ class CourseAssignmentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Set the 'assigned_by_user' to the current user automatically
         serializer.save(assigned_by_user=self.request.user)
+
+# --- View to get a full quiz with questions and answers ---
+class QuizDetailView(generics.RetrieveAPIView):
+    queryset = Quiz.objects.all()
+    serializer_class = QuizDetailSerializer
+    permission_classes = [permissions.IsAuthenticated] # Or AllowAny if quizzes are public
+
+# --- View to submit answers and get a score ---
+class SubmitQuizView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        # The user will send a POST request with a list of answer IDs they selected
+        # Example body: { "submitted_answer_ids": [1, 5, 10] }
+        submitted_answer_ids = request.data.get('submitted_answer_ids', [])
+        
+        if not isinstance(submitted_answer_ids, list):
+            return Response({"error": "submitted_answer_ids must be a list"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            quiz = Quiz.objects.get(pk=pk)
+        except Quiz.DoesNotExist:
+            return Response({"error": "Quiz not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Get all questions for this quiz
+        total_questions = quiz.questions.count()
+        
+        # Find how many of the submitted answers are correct
+        correct_answers = Answer.objects.filter(
+            question__quiz=quiz, 
+            id__in=submitted_answer_ids, 
+            is_correct=True
+        ).count()
+        
+        score = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
+
+        # Requirement 4: Show end-score
+        return Response({
+            "quiz_id": quiz.id,
+            "total_questions": total_questions,
+            "correct_answers": correct_answers,
+            "score": round(score, 2)
+        }, status=status.HTTP_200_OK)
