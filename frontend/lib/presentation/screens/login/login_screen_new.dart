@@ -30,7 +30,8 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
     if (!mounted) return;
     setState(() => _loading = false);
     if (ok) {
-      context.go('/dashboard');
+      //context.go('/dashboard');
+      context.go('/');
     } else {
       setState(() => _error = 'Nieprawidłowy email lub hasło');
     }

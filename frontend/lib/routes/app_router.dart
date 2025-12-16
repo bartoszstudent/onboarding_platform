@@ -6,9 +6,39 @@ import '../presentation/screens/dashboard/dashboard_screen.dart';
 import '../presentation/layouts/main_layout.dart';
 import '../presentation/screens/courses/courses_list_screen.dart';
 import '../presentation/screens/users/users_list_screen.dart';
+import '../data/services/auth_service.dart';
+import '../data/services/auth_state.dart';
 
 class AppRouter {
   static final router = GoRouter(
+    refreshListenable: AuthState.instance,
+    redirect: (context, state) async {
+      final loggedIn = await AuthService.isLoggedIn();
+      final role = await AuthService.getRole();
+
+      final goingToLogin = state.location == '/';
+
+      if (!loggedIn && !goingToLogin) {
+        return '/';
+      }
+
+      if (loggedIn && goingToLogin) {
+        return '/dashboard';
+      }
+
+      if (role == 'admin') {
+        return null;
+      }
+
+      if (role == 'user') {
+        if (state.location == '/users' || state.location == '/companies') {
+          return '/dashboard';
+        }
+      }
+
+      return null;
+    },
+
     initialLocation: '/',
     routes: [
       GoRoute(
