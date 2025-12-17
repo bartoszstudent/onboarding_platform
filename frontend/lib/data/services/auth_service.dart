@@ -1,9 +1,10 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:jwt_decode/jwt_decode.dart';
 import '../../core/utils/token_manager.dart';
 import '../models/user_model.dart';
+import 'auth_state.dart';
 import 'api_client.dart';
 
 class AuthService {
@@ -42,7 +43,6 @@ class AuthService {
       );
 
       if (response.statusCode != 200) {
-        // Możesz tu sparsować response.body i zwrócić bardziej szczegółowy błąd
         return false;
       }
 
@@ -64,6 +64,8 @@ class AuthService {
       // Zapis użytkownika w SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_userKey, jsonEncode(user.toJson()));
+
+      AuthState.instance.notify();
 
       return true;
     } catch (_) {
@@ -93,8 +95,18 @@ class AuthService {
     }
   }
 
-  /// Zwraca rolę aktualnego użytkownika (np. "admin", "hr", "employee").
+  /// Zwraca rolę aktualnego użytkownika ("admin", "user").
   static Future<String?> getRole() async {
+    final token = await TokenManager.getToken();
+    if (token != null) {
+      try {
+        // Dekodowanie tokena JWT i odczyt pola 'role'
+        final payload = Jwt.parseJwt(token);
+        if (payload.containsKey('role')) return payload['role'] as String;
+      } catch (_) {
+        // fallback: jeśli coś pójdzie nie tak, sprawdzamy usera w SharedPreferences
+      }
+    }
     final user = await getCurrentUser();
     return user?.role;
   }
@@ -104,5 +116,7 @@ class AuthService {
     await TokenManager.clearToken();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userKey);
+
+    AuthState.instance.notify();
   }
 }

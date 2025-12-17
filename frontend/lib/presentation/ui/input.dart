@@ -6,6 +6,7 @@ class AppInput extends StatelessWidget {
   final String? labelText;
   final bool obscureText;
   final String? Function(String?)? validator;
+  final TextInputType? keyboardType;
 
   const AppInput(
       {super.key,
@@ -13,7 +14,8 @@ class AppInput extends StatelessWidget {
       this.hintText,
       this.labelText,
       this.obscureText = false,
-      this.validator});
+      this.validator,
+      this.keyboardType});
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +23,7 @@ class AppInput extends StatelessWidget {
       controller: controller,
       obscureText: obscureText,
       validator: validator,
+      keyboardType: keyboardType,
       decoration: InputDecoration(
         // Prefer showing a stationary placeholder. If a labelText was
         // provided, we keep it as hintText and disable the floating label

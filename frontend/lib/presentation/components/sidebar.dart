@@ -58,7 +58,8 @@ class _SidebarState extends State<Sidebar> {
         });
       });
     }
-    final location = GoRouter.of(context).location;
+
+    final location = GoRouterState.of(context).uri.path;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
