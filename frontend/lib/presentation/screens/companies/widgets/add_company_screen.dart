@@ -1,25 +1,105 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/design_tokens.dart';
 import '../../../ui/input.dart';
+import '../../../../data/services/company_service.dart';
 
-class AddCompanyModal extends StatelessWidget {
-  final Map<String, dynamic> newCompany;
-  final Function(String key, dynamic value) onChange;
+class AddCompanyModal extends StatefulWidget {
+  final VoidCallback onSuccess;
   final VoidCallback onCancel;
-  final VoidCallback onSubmit;
-  final GlobalKey<FormState> formKey;
 
   const AddCompanyModal({
     super.key,
-    required this.newCompany,
-    required this.onChange,
+    required this.onSuccess,
     required this.onCancel,
-    required this.onSubmit,
-    required this.formKey,
   });
 
   @override
+  State<AddCompanyModal> createState() => _AddCompanyModalState();
+}
+
+class _AddCompanyModalState extends State<AddCompanyModal> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final Map<String, dynamic> _newCompany = {};
+  bool _isLoading = false;
+
+  void _onChange(String key, dynamic value) {
+    setState(() {
+      _newCompany[key] = value;
+    });
+  }
+
+  Future<void> _handleSubmit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await CompanyService.createCompany(
+        name: (_newCompany['name'] ?? '').trim(),
+        domain: (_newCompany['domain'] ?? '').trim(),
+        logoUrl: (_newCompany['logo_url'] ?? '').trim().isEmpty
+            ? null
+            : (_newCompany['logo_url'] ?? '').trim(),
+        primaryColor: (_newCompany['primary_color'] ?? '#2563EB').trim(),
+        secondaryColor: (_newCompany['secondary_color'] ?? '#1E40AF').trim(),
+        accentColor: (_newCompany['accent_color'] ?? '#3B82F6').trim(),
+      );
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Sukces! 🎉'),
+              content: const Text('Firma została utworzona pomyślnie.'),
+              actions: [
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context); // Zamknij dialog
+                    Navigator.pop(context); // Zamknij modal AddCompanyModal
+                    widget.onSuccess(); // Odśwież listę firm
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Tokens.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Błąd: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final Map<String, dynamic> newCompany = _newCompany;
+    final Function(String key, dynamic value) onChange = _onChange;
+    final VoidCallback onCancel = widget.onCancel;
+    final GlobalKey<FormState> formKey = _formKey;
+
     return Stack(
       children: [
         // Tło półprzezroczyste
@@ -39,11 +119,13 @@ class AddCompanyModal extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Nagłówek
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Nagłówek
                       Text(
                         "Dodaj nową firmę",
                         style: TextStyle(
@@ -54,7 +136,7 @@ class AddCompanyModal extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        "Każda firma otrzyma własną subdomenę i administratora",
+                        "Wypełnij pola wymagane: name, domain, logo_url, primary_color, secondary_color, accent_color.",
                         style: TextStyle(
                           fontSize: 12,
                           color: Tokens.textMuted2,
@@ -71,7 +153,7 @@ class AddCompanyModal extends StatelessWidget {
                       ),
                       const SizedBox(height: Tokens.spacingSm),
 
-                      // Nazwa firmy i Subdomena
+                      // Nazwa firmy i domena
                       Row(
                         children: [
                           Expanded(
@@ -91,6 +173,9 @@ class AddCompanyModal extends StatelessWidget {
                                   keyName: "name",
                                   initialValue: newCompany["name"] ?? "",
                                   onChange: onChange,
+                                  validator: (v) => (v == null || v.trim().isEmpty)
+                                      ? 'Podaj nazwę firmy'
+                                      : null,
                                   height: 28,
                                 ),
                               ],
@@ -102,7 +187,7 @@ class AddCompanyModal extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  "Subdomena",
+                                  "Domena",
                                   style: TextStyle(
                                     color: Tokens.textDark,
                                     fontSize: 10,
@@ -114,16 +199,19 @@ class AddCompanyModal extends StatelessWidget {
                                   children: [
                                     Expanded(
                                       child: _AppInputField(
-                                        keyName: "subdomain",
-                                        initialValue:
-                                            newCompany["subdomain"] ?? "",
+                                        keyName: "domain",
+                                        initialValue: newCompany["domain"] ?? "",
                                         onChange: onChange,
+                                        validator: (v) => (v == null || v.trim().isEmpty)
+                                            ? 'onboardly.com'
+                                            : null,
+                                        keyboardType: TextInputType.url,
                                         height: 28,
                                       ),
                                     ),
                                     const SizedBox(width: Tokens.spacingXs),
-                                    Text(
-                                      ".onboardly.app",
+                                    const Text(
+                                      "onboardly.com",
                                       style: TextStyle(
                                         color: Tokens.textMuted2,
                                         fontSize: 12,
@@ -137,8 +225,7 @@ class AddCompanyModal extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: Tokens.spacingSm),
-
-                      // Maksymalna liczba użytkowników i kursów
+                      // Logo URL i kolory
                       Row(
                         children: [
                           Expanded(
@@ -146,17 +233,46 @@ class AddCompanyModal extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  "Maksymalna liczba użytkowników",
+                                  "Logo URL (opcjonalne)",
                                   style: TextStyle(
-                                    fontSize: 10,
                                     color: Tokens.textDark,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
                                 _AppInputField(
-                                  keyName: "maxUsers",
-                                  initialValue: newCompany["maxUsers"]?.toString() ?? "",
+                                  keyName: "logo_url",
+                                  initialValue: newCompany["logo_url"] ?? "",
+                                  onChange: onChange,
+                                  height: 28,
+                                  keyboardType: TextInputType.url,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: Tokens.spacingSm),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Primary color (hex)",
+                                  style: TextStyle(
+                                    color: Tokens.textDark,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                _AppInputField(
+                                  keyName: "primary_color",
+                                  initialValue: newCompany["primary_color"] ?? "#2563EB",
                                   onChange: onChange,
                                   height: 28,
                                 ),
@@ -169,18 +285,17 @@ class AddCompanyModal extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  "Maksymalna liczba kursów",
+                                  "Secondary color (hex)",
                                   style: TextStyle(
-                                    fontSize: 10,
                                     color: Tokens.textDark,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
                                 _AppInputField(
-                                  keyName: "maxCourses",
-                                  initialValue:
-                                      newCompany["maxCourses"]?.toString() ?? "",
+                                  keyName: "secondary_color",
+                                  initialValue: newCompany["secondary_color"] ?? "#1E40AF",
                                   onChange: onChange,
                                   height: 28,
                                 ),
@@ -191,91 +306,24 @@ class AddCompanyModal extends StatelessWidget {
                       ),
                       const SizedBox(height: Tokens.spacingSm),
 
-                      // Tutaj używamy companyLogo
-                      Row( 
-                        children: [ 
-                          Container( 
-                            width: 70, 
-                            height: 70, 
-                            decoration: 
-                            BoxDecoration( 
-                              color: Tokens.gray100, 
-                              borderRadius: BorderRadius.circular(Tokens.radius2xl), 
-                              border: Border.all(color: Tokens.gray200), 
-                              ), 
-                              child: 
-                              Icon( 
-                                Icons.apartment_rounded, 
-                                size: 32, 
-                                color: Tokens.textMuted2, 
-                                ), 
-                          ), 
-                          const SizedBox(width: Tokens.spacing), 
-                          OutlinedButton( 
-                            style: OutlinedButton.styleFrom( 
-                              side: BorderSide(
-                                color: Tokens.gray100), 
-                                backgroundColor: Tokens.gray50, 
-                                ), 
-                                onPressed: () {}, 
-                                child: 
-                                Text( "Prześlij logo", 
-                                style: 
-                                TextStyle(color: Tokens.textMuted2), 
-                                ), 
-                          ), 
-                        ], 
-                      ),
-                      // Administrator
-                      Text( "Główny administrator",
-                            style: TextStyle(
-                              color: Tokens.textDark,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
                       Row(
                         children: [
-                          const SizedBox(width: Tokens.spacing), 
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  "Imię i nazwisko administratora",
+                                  "Accent color (hex)",
                                   style: TextStyle(
-                                    fontSize: 10,
                                     color: Tokens.textDark,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
                                 _AppInputField(
-                                  keyName: "adminName",
-                                  initialValue: newCompany["adminName"] ?? "",
-                                  onChange: onChange,
-                                  height: 28,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: Tokens.spacingSm),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "Email administratora",
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Tokens.textDark,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                _AppInputField(
-                                  keyName: "adminEmail",
-                                  initialValue: newCompany["adminEmail"] ?? "",
+                                  keyName: "accent_color",
+                                  initialValue: newCompany["accent_color"] ?? "#3B82F6",
                                   onChange: onChange,
                                   height: 28,
                                 ),
@@ -283,22 +331,6 @@ class AddCompanyModal extends StatelessWidget {
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: Tokens.spacingSm),
-
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Tokens.blue100,
-                          borderRadius: BorderRadius.circular(Tokens.radius),
-                        ),
-                        child: Text(
-                          "💡 Administrator otrzyma email z linkiem aktywacyjnym i danymi dostępowymi",
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Tokens.blue700,
-                          ),
-                        ),
                       ),
                       const SizedBox(height: Tokens.spacingSm),
 
@@ -323,12 +355,7 @@ class AddCompanyModal extends StatelessWidget {
                           const SizedBox(width: Tokens.spacingXs),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () {
-                                if (formKey.currentState!.validate()) {
-                                  onSubmit();
-                                  Navigator.pop(context);
-                                }
-                              },
+                              onPressed: _isLoading ? null : _handleSubmit,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Tokens.blue,
                                 foregroundColor: Colors.white,
@@ -339,7 +366,16 @@ class AddCompanyModal extends StatelessWidget {
                                 textStyle: const TextStyle(
                                     fontWeight: FontWeight.w600, fontSize: 12),
                               ),
-                              child: const Text('Utwórz firmę'),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      height: 16,
+                                      width: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Text('Utwórz firmę'),
                             ),
                           ),
                         ],
@@ -350,6 +386,7 @@ class AddCompanyModal extends StatelessWidget {
               ),
             ),
           ),
+        ),
         ),
       ],
     );
@@ -362,6 +399,8 @@ class _AppInputField extends StatefulWidget {
   final String initialValue;
   final Function(String key, String value) onChange;
   final double height;
+  final String? Function(String?)? validator;
+  final TextInputType? keyboardType;
 
   const _AppInputField({
     super.key,
@@ -369,6 +408,8 @@ class _AppInputField extends StatefulWidget {
     required this.initialValue,
     required this.onChange,
     this.height = 30,
+    this.validator,
+    this.keyboardType,
   });
 
   @override
@@ -401,6 +442,8 @@ class _AppInputFieldState extends State<_AppInputField> {
         controller: _controller,
         labelText: "",
         hintText: "",
+        validator: widget.validator,
+        keyboardType: widget.keyboardType,
       ),
     );
   }

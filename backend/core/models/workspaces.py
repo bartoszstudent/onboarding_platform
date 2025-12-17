@@ -9,6 +9,12 @@ class Company(models.Model):
     domain = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
 
+        # Pola personalizacji UI
+    logo_url = models.URLField(blank=True, null=True)
+    primary_color = models.CharField(max_length=7, default="#2563EB")
+    secondary_color = models.CharField(max_length=7, default="#1E40AF")
+    accent_color = models.CharField(max_length=7, default="#3B82F6")
+
     def __str__(self):
         return self.name
 
@@ -18,6 +24,14 @@ class Workspace(models.Model):
 
     def __str__(self):
         return self.name
+    
+class UserCompany(models.Model):
+        user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="user_company")
+        company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="company_users")
+        role = models.CharField(max_length=50, default="employee")
+
+        def __str__(self):
+            return f"{self.user.username} -> {self.company.name}"
 
 class Invitation(models.Model):
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name="invitations")
