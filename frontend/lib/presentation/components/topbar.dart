@@ -4,9 +4,46 @@ import 'package:go_router/go_router.dart';
 import '../components/user_avatar.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../data/services/auth_service.dart';
+import 'widgets/notification_panel.dart';
 
-class Topbar extends StatelessWidget {
-  const Topbar({super.key});
+class Topbar extends StatefulWidget {
+  Topbar({super.key});
+
+  @override
+  State<Topbar> createState() => _TopbarState();
+}
+
+class _TopbarState extends State<Topbar> {
+
+  final GlobalKey _bellKey = GlobalKey();
+
+  void _toggleNotifications(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    showDialog(
+      context: context,
+      barrierColor: Colors.transparent, // przezroczyste tło
+      builder: (_) => Stack(
+        children: [
+          // kliknięcie poza panelem → zamyka dialog
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              behavior: HitTestBehavior.translucent,
+            ),
+          ),
+          // panel powiadomień
+          Positioned(
+            top: topPadding + 68, // pod Topbarem
+            right: 16,
+            child: NotificationPanel(
+              onClose: () => Navigator.of(context).pop(),
+              width: 385,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +95,8 @@ class Topbar extends StatelessWidget {
 
           // Actions
           IconButton(
-              onPressed: () {},
+            key: _bellKey,
+              onPressed: () => _toggleNotifications(context),
               icon: SvgPicture.asset('assets/icons/bell.svg',
                   width: 20, height: 20, color: Colors.black54)),
           const SizedBox(width: 8),
