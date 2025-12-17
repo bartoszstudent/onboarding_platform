@@ -1,6 +1,24 @@
 from rest_framework import serializers
 from .models.training import Course, CourseAssignment
 from django.contrib.auth import get_user_model
+from .models.workspaces import Company
+
+class CompanySerializer(serializers.ModelSerializer):
+    """Serializer do tworzenia i pobierania firm"""
+
+    class Meta:
+        model = Company
+        fields = [
+            "id",
+            "name",
+            "domain",
+            "logo_url",
+            "primary_color",
+            "secondary_color",
+            "accent_color",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
 
 User = get_user_model()
 

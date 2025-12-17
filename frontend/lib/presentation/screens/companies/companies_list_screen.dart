@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../ui/app_card.dart';
 import '../../../core/constants/design_tokens.dart';
+import '../../../data/services/company_service.dart';
+import '../../../data/models/company_model.dart';
 import 'widgets/add_company_screen.dart';
 import 'widgets/manage_company_screen.dart';
 
@@ -35,10 +37,44 @@ class _CompanyManagementScreenState extends State<CompanyManagementScreen> {
   bool _showAdd = false;
   bool _showEdit = false;
   bool _showManage = false;
+  bool _isLoading = true;
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   Map<String, dynamic>? _selectedCompany;
+  List<Company> _apiCompanies = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCompanies();
+  }
+
+  Future<void> _loadCompanies() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final companies = await CompanyService.listCompanies();
+      setState(() {
+        _apiCompanies = companies;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Błąd pobierania firm: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   final List<Map<String, dynamic>> _companies = [
     {
@@ -116,7 +152,28 @@ class _CompanyManagementScreenState extends State<CompanyManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _companies.where((c) {
+    // Mapowanie firm z API na format wyświetlania
+    final List<Map<String, dynamic>> displayCompanies = _apiCompanies.map((c) {
+      return {
+        'id': c.id.toString(),
+        'name': c.name,
+        'domain': c.domain,
+        'subdomain': '${c.domain}.onboardly.app',
+        'employees': 0,
+        'courses': 0,
+        'logo': c.logoUrl ?? '',
+        'admins': [],
+        'status': 'active',
+        'maxUsers': 100,
+        'maxCourses': 50,
+        'createdAt': c.createdAt?.toString().split(' ')[0] ?? '2025-01-01',
+      };
+    }).toList();
+
+    // Jeśli nie ma firm z API, użyj przykładowych
+    final companiesData = displayCompanies.isEmpty ? _companies : displayCompanies;
+
+    final filtered = companiesData.where((c) {
       final matchesSearch = _search.isEmpty ||
           c['name'].toLowerCase().contains(_search.toLowerCase()) ||
           c['subdomain'].toLowerCase().contains(_search.toLowerCase());
@@ -204,7 +261,14 @@ class _CompanyManagementScreenState extends State<CompanyManagementScreen> {
               // Table
               AppCard(
                 padding: EdgeInsets.zero,
-                child: Column(
+                child: _isLoading
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(40.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    : Column(
                   children: [
                     Container(
                       color: Tokens.gray50,
@@ -222,6 +286,14 @@ class _CompanyManagementScreenState extends State<CompanyManagementScreen> {
                         ],
                       ),
                     ),
+                    if (filtered.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(40.0),
+                        child: Text(
+                          'Brak firm do wyświetlenia',
+                          style: TextStyle(color: Tokens.textMuted2),
+                        ),
+                      ),
                     ...filtered.map((c) {
                       return _HoverableListItem(
                         onTap: () {},
@@ -386,29 +458,10 @@ class _CompanyManagementScreenState extends State<CompanyManagementScreen> {
         // ---- MODAL AddCompanyModal ----
         if (_showAdd)
           AddCompanyModal(
-            formKey: _formKey,
-            newCompany: {
-              "name": "",
-              "subdomain": "",
-              "maxUsers": 0,
-              "maxCourses": 0,
-              "adminName": "",
-              "adminEmail": "",
-            },
-            onChange: (key, value) {
-              setState(() {
-                _selectedCompany ??= {};
-                _selectedCompany![key] = value;
-              });
-            },
             onCancel: () => setState(() => _showAdd = false),
-            onSubmit: () {
-              if (_formKey.currentState?.validate() ?? false) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Firma utworzona (mock)!')),
-                );
-                setState(() => _showAdd = false);
-              }
+            onSuccess: () {
+              _loadCompanies();
+              setState(() => _showAdd = false);
             },
           ),
 
