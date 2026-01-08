@@ -9,6 +9,7 @@ import '../presentation/screens/users/users_list_screen.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/auth_state.dart';
 
+
 class AppRouter {
   static final router = GoRouter(
     refreshListenable: AuthState.instance,
@@ -16,7 +17,7 @@ class AppRouter {
       final loggedIn = await AuthService.isLoggedIn();
       final role = await AuthService.getRole();
 
-      final goingToLogin = state.location == '/';
+      final goingToLogin = state.uri.path == '/';
 
       if (!loggedIn && !goingToLogin) {
         return '/';
@@ -31,7 +32,7 @@ class AppRouter {
       }
 
       if (role == 'user') {
-        if (state.location == '/users' || state.location == '/companies') {
+        if (state.uri.path == '/users' || state.uri.path == '/companies') {
           return '/dashboard';
         }
       }
