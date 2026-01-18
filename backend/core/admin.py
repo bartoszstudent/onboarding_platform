@@ -4,6 +4,7 @@ from . import models
 # Register your models here to see them in the admin UI.
 # This will now work because __init__.py is correctly configured.
 admin.site.register(models.Company)
+admin.site.register(models.UserCompany)
 admin.site.register(models.Workspace)
 admin.site.register(models.Course)
 admin.site.register(models.CourseAssignment)
