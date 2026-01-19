@@ -19,7 +19,7 @@ class AppRouter {
       final loggedIn = await AuthService.isLoggedIn();
       final role = await AuthService.getRole();
 
-      final goingToLogin = state.location == '/';
+      final goingToLogin = state.uri.toString() == '/';
 
       if (!loggedIn && !goingToLogin) {
         return '/';
@@ -34,7 +34,7 @@ class AppRouter {
       }
 
       if (role == 'user') {
-        if (state.location == '/users' || state.location == '/companies') {
+        if (state.uri.toString() == '/users' || state.uri.toString() == '/companies') {
           return '/dashboard';
         }
       }
