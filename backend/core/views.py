@@ -15,6 +15,15 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from .models import Quiz, Company, UserCompany, Answer
 from .serializers import QuizDetailSerializer, CompanySerializer
+from rest_framework.permissions import AllowAny, IsAuthenticated # Added IsAuthenticated
+from .models import (
+    Course, CourseAssignment, Question, Answer,
+    Company, UserCompany, UserBadge, Badge, Quiz
+)
+from .serializers import (
+    CourseSerializer, CourseAssignmentSerializer, 
+    QuizDetailSerializer, CompanySerializer, UserBadgeSerializer # Added UserBadgeSerializer
+)
 
 User = get_user_model()
 
@@ -308,3 +317,9 @@ class SubmitQuizView(views.APIView):
             "correct_answers": correct_answers,
             "score": round(score, 2)
         }, status=status.HTTP_200_OK)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_badges(request):
+    user_badges = UserBadge.objects.filter(user=request.user)
+    serializer = UserBadgeSerializer(user_badges, many=True)
+    return Response(serializer.data)
