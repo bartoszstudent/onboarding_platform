@@ -34,14 +34,14 @@ class AppRouter {
       }
 
       if (role == 'user') {
-        if (state.uri.toString() == '/users' || state.uri.toString() == '/companies') {
+        if (state.uri.toString() == '/users' ||
+            state.uri.toString() == '/companies') {
           return '/dashboard';
         }
       }
 
       return null;
     },
-
     initialLocation: '/',
     routes: [
       GoRoute(
