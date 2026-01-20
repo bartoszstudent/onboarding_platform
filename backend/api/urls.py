@@ -1,13 +1,14 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet, UserAssignedCoursesViewSet, CourseAssignmentViewSet, create_company, list_companies, get_company, CompanyManagementViewSet, CompanyUsersViewSet, CompanyCourseViewSet
+from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet, UserAssignedCoursesViewSet, CourseAssignmentViewSet, create_company, list_companies, get_company, CompanyManagementViewSet, CompanyUsersViewSet, CompanyCourseViewSet, CompetencyViewSet
 
 # Create a router and register our viewsets with it.
 router = DefaultRouter()
 router.register(r'courses', CourseViewSet)
 router.register(r'course-assignments', CourseAssignmentViewSet)
 router.register(r'companies', CompanyManagementViewSet, basename='company')
+router.register(r'competencies', CompetencyViewSet, basename='competency')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

@@ -3,6 +3,7 @@ from .models.training import Course, CourseAssignment
 from django.contrib.auth import get_user_model
 from .models.workspaces import Company
 from .models import UserCompany, Company, CourseAssignment
+from .models.competencies import Competency, CompetencyCourse
 
 class CompanySerializer(serializers.ModelSerializer):
     """Serializer do tworzenia i pobierania firm"""
@@ -85,3 +86,89 @@ class BulkCourseAssignmentSerializer(serializers.Serializer):
         child=serializers.IntegerField(),
         allow_empty=False
     )
+
+# --- Serializery do Kompetencji ---
+
+class CompetencySerializer(serializers.ModelSerializer):
+    """Serializer for listing and creating competencies"""
+    courses = serializers.PrimaryKeyRelatedField(
+        many=True, 
+        queryset=Course.objects.all(),
+        required=False,
+        write_only=True
+    )
+    
+    class Meta:
+        model = Competency
+        fields = ['id', 'workspace', 'name', 'description', 'courses']
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Filtruj kursy na podstawie workspace
+        request = self.context.get('request')
+        if request and request.method in ['POST', 'PUT', 'PATCH']:
+            # Podczas tworzenia/edycji - filtruj na podstawie workspace z requesta
+            workspace_id = request.data.get('workspace')
+            if workspace_id:
+                self.fields['courses'].queryset = Course.objects.filter(workspace_id=workspace_id)
+        elif self.instance:
+            # Podczas edycji istniejącej kompetencji
+            self.fields['courses'].queryset = Course.objects.filter(workspace=self.instance.workspace)
+    
+    def validate(self, data):
+        """Sprawdź czy wybrane kursy należą do tego samego workspace co kompetencja"""
+        workspace = data.get('workspace')
+        courses = data.get('courses', [])
+        
+        if workspace and courses:
+            for course in courses:
+                if course.workspace != workspace:
+                    raise serializers.ValidationError({
+                        'courses': f'Kurs "{course.title}" nie należy do wybranego workspace.'
+                    })
+        
+        return data
+    
+    def create(self, validated_data):
+        courses_data = validated_data.pop('courses', [])
+        competency = Competency.objects.create(**validated_data)
+        
+        # Przypisz kursy do kompetencji
+        for course in courses_data:
+            CompetencyCourse.objects.create(competency=competency, course=course)
+        
+        return competency
+    
+    def update(self, instance, validated_data):
+        courses_data = validated_data.pop('courses', None)
+        
+        # Aktualizuj podstawowe pola
+        instance.name = validated_data.get('name', instance.name)
+        instance.description = validated_data.get('description', instance.description)
+        instance.workspace = validated_data.get('workspace', instance.workspace)
+        instance.save()
+        
+        # Jeśli przesłano kursy, zaktualizuj relacje
+        if courses_data is not None:
+            # Usuń istniejące relacje
+            CompetencyCourse.objects.filter(competency=instance).delete()
+            # Dodaj nowe
+            for course in courses_data:
+                CompetencyCourse.objects.create(competency=instance, course=course)
+        
+        return instance
+
+
+class CompetencyDetailSerializer(serializers.ModelSerializer):
+    """Detailed serializer with full course information"""
+    courses = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Competency
+        fields = ['id', 'workspace', 'name', 'description', 'courses']
+    
+    def get_courses(self, obj):
+        competency_courses = CompetencyCourse.objects.filter(competency=obj).select_related('course')
+        courses = [cc.course for cc in competency_courses]
+        return CourseSerializer(courses, many=True).data
