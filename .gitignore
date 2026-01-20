@@ -25,6 +25,9 @@ backend/venv/
 backend/__pycache__/
 backend/*.sqlite3
 backend/api/__pycache__/
+backend/core/__pycache__/
+backend/core/migrations/__pycache__/
+backend/core/models/__pycache__/
 
 # Build / outputs
 /build/
@@ -91,4 +94,3 @@ frontend/macos/Flutter/GeneratedPluginRegistrant.swift
 frontend/windows/flutter/generated_plugin_registrant.cc
 frontend/windows/flutter/generated_plugin_registrant.h
 frontend/windows/flutter/generated_plugins.cmake
-
