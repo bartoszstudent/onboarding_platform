@@ -7,6 +7,13 @@ from .training import Course
 class Competency(models.Model):
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default='')
+
+    class Meta:
+        verbose_name_plural = "Competencies"
+
+    def __str__(self):
+        return self.name
 
 
 class CompetencyCourse(models.Model):
