@@ -28,6 +28,9 @@ backend/api/__pycache__/
 backend/core/__pycache__/
 backend/core/migrations/__pycache__/
 backend/core/models/__pycache__/
+backend/core/__pycache__/
+backend/core/migrations/__pycache__/
+backend/core/models/__pycache__/
 
 # Build / outputs
 /build/

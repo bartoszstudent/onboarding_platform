@@ -12,6 +12,7 @@ import '../presentation/screens/branding_settings/branding_settings_screen.dart'
 import '../data/services/auth_service.dart';
 import '../data/services/auth_state.dart';
 
+
 class AppRouter {
   static final router = GoRouter(
     refreshListenable: AuthState.instance,

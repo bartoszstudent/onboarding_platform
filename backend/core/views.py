@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.core import signing
@@ -7,25 +8,36 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from django.shortcuts import get_object_or_404
+
 from rest_framework import viewsets, permissions, status, generics, views
-from .models.training import Course, CourseAssignment
-from .serializers import CourseSerializer, CourseAssignmentSerializer
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, action
-from rest_framework.permissions import AllowAny
-from .models import Quiz, Company, UserCompany, Answer, Workspace, Course, CourseAssignment
-from .serializers import QuizDetailSerializer, CompanySerializer
-from django.shortcuts import get_object_or_404
-from .models.workspaces import User  # lub get_user_model()
-from .serializers import ( 
+from rest_framework.permissions import AllowAny, IsAuthenticated
+
+from .models.training import Course, CourseAssignment
+from .models.workspaces import User, Workspace
+from .models import (
+    Quiz, Company, UserCompany, Question, Answer,
+    Badge, UserBadge
+)
+
+from .serializers import (
     CourseSerializer, 
+    CourseAssignmentSerializer, 
+    QuizDetailSerializer, 
+    CompanySerializer, 
+    UserBadgeSerializer, 
     CompanyUserAddSerializer, 
+    UserCompanyListSerializer, 
+    BulkCourseAssignmentSerializer
     UserCompanyListSerializer,
     BulkCourseAssignmentSerializer,
     CourseAssignmentSerializer,
     CompetencySerializer,
     CompetencyDetailSerializer
 )
+
 from .permissions import IsCompanyAdmin
 from .models.competencies import Competency
 
@@ -321,6 +333,12 @@ class SubmitQuizView(views.APIView):
             "correct_answers": correct_answers,
             "score": round(score, 2)
         }, status=status.HTTP_200_OK)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_badges(request):
+    user_badges = UserBadge.objects.filter(user=request.user)
+    serializer = UserBadgeSerializer(user_badges, many=True)
+    return Response(serializer.data)
     
 class CompanyManagementViewSet(viewsets.ModelViewSet):
     """
