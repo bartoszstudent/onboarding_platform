@@ -9,11 +9,13 @@ from core.views import (
     create_company, list_companies, get_company,
     my_badges, CompanyManagementViewSet, CompanyUsersViewSet, CompanyCourseViewSet
 )
+from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet, UserAssignedCoursesViewSet, CourseAssignmentViewSet, create_company, list_companies, get_company, CompanyManagementViewSet, CompanyUsersViewSet, CompanyCourseViewSet, CompetencyViewSet
 
 router = DefaultRouter()
 router.register(r'courses', CourseViewSet, basename='course')
 router.register(r'course-assignments', CourseAssignmentViewSet, basename='course-assignment')
 router.register(r'companies', CompanyManagementViewSet, basename='company')
+router.register(r'competencies', CompetencyViewSet, basename='competency')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

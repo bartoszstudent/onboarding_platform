@@ -31,9 +31,15 @@ from .serializers import (
     CompanyUserAddSerializer, 
     UserCompanyListSerializer, 
     BulkCourseAssignmentSerializer
+    UserCompanyListSerializer,
+    BulkCourseAssignmentSerializer,
+    CourseAssignmentSerializer,
+    CompetencySerializer,
+    CompetencyDetailSerializer
 )
 
 from .permissions import IsCompanyAdmin
+from .models.competencies import Competency
 
 User = get_user_model()
 
@@ -469,3 +475,43 @@ class CompanyCourseViewSet(viewsets.ViewSet):
             return Response({"assigned": len(assignments)}, status=status.HTTP_200_OK)
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CompetencyViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for CRUD operations on Competencies.
+    
+    GET /api/competencies/ - list all competencies
+    POST /api/competencies/ - create new competency
+    GET /api/competencies/{id}/ - retrieve single competency with details
+    PUT /api/competencies/{id}/ - update competency
+    PATCH /api/competencies/{id}/ - partial update competency
+    DELETE /api/competencies/{id}/ - delete competency
+    
+    Body dla POST/PUT:
+    {
+      "workspace": 1,
+      "name": "Nazwa kompetencji",
+      "description": "Krótki opis kompetencji",
+      "courses": [1, 2, 3]  // IDs kursów
+    }
+    """
+    queryset = Competency.objects.all()
+    permission_classes = [permissions.AllowAny]  # Change to IsAuthenticated later
+    
+    def get_serializer_class(self):
+        # Użyj szczegółowego serializera dla retrieve (GET single)
+        if self.action == 'retrieve':
+            return CompetencyDetailSerializer
+        return CompetencySerializer
+    
+    def list(self, request, *args, **kwargs):
+        """List all competencies with their courses"""
+        queryset = self.get_queryset()
+        # Opcjonalnie filtruj po workspace
+        workspace_id = request.query_params.get('workspace', None)
+        if workspace_id:
+            queryset = queryset.filter(workspace_id=workspace_id)
+        
+        serializer = CompetencyDetailSerializer(queryset, many=True)
+        return Response(serializer.data)
