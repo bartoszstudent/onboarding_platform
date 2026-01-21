@@ -9,6 +9,7 @@ from .models.answer import Answer
 from .models.checkpoint import Checkpoint
 
 User = get_user_model()
+from .models import UserCompany
 
 class CompanySerializer(serializers.ModelSerializer):
     """Serializer do tworzenia i pobierania firm"""
@@ -87,3 +88,35 @@ class QuizDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Quiz
         fields = ['id', 'title', 'questions']
+        
+class CompanyUserAddSerializer(serializers.ModelSerializer):
+    """Służy do dodawania istniejącego lub nowego użytkownika do firmy"""
+    email = serializers.EmailField()
+    first_name = serializers.CharField(required=False)
+    last_name = serializers.CharField(required=False)
+    role = serializers.ChoiceField(choices=[('employee', 'Employee'), ('admin', 'Admin')], default='employee')
+
+    class Meta:
+        model = UserCompany
+        fields = ['email', 'first_name', 'last_name', 'role']
+
+class UserCompanyListSerializer(serializers.ModelSerializer):
+    """Do wyświetlania listy pracowników"""
+    email = serializers.EmailField(source='user.email')
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+    user_id = serializers.IntegerField(source='user.id')
+
+    class Meta:
+        model = UserCompany
+        fields = ['id', 'user_id', 'email', 'first_name', 'last_name', 'role']
+
+# --- Serializery do Przypisywania Kursów ---
+
+class BulkCourseAssignmentSerializer(serializers.Serializer):
+    """Pozwala przypisać wielu użytkowników do jednego kursu na raz"""
+    course_id = serializers.IntegerField()
+    user_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        allow_empty=False
+    )

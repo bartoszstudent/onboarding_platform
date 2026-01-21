@@ -31,6 +31,7 @@ class SectionInline(admin.StackedInline):
     extra = 0
     
 admin.site.register(models.Company)
+admin.site.register(models.UserCompany)
 admin.site.register(models.Workspace)
 admin.site.register(models.Course)
 admin.site.register(models.Section)
