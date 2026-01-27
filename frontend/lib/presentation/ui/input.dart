@@ -26,7 +26,7 @@ class AppInput extends StatelessWidget {
       obscureText: obscureText,
       validator: validator,
       keyboardType: keyboardType,
-      maxLines: maxLines,
+      maxLines: obscureText ? 1 : maxLines,
       decoration: InputDecoration(
         // Prefer showing a stationary placeholder. If a labelText was
         // provided, we keep it as hintText and disable the floating label
