@@ -50,30 +50,28 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
           if (role != 'employee') const app_ui.Badge(text: 'Admin')
         ]),
         actions: [
-          if (role == 'admin' || role == 'hr')
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const CourseCreateScreen()),
-                  );
-                },
-                icon: SvgPicture.asset('assets/icons/plus.svg',
-                    width: 18, height: 18, color: Colors.white),
-                label: const Text('Dodaj kurs'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Tokens.blue,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(Tokens.radius)),
-                ),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CourseCreateScreen()),
+                );
+              },
+              icon: SvgPicture.asset('assets/icons/plus.svg',
+                  width: 18, height: 18, color: Colors.white),
+              label: const Text('Dodaj kurs'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Tokens.blue,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(Tokens.radius)),
               ),
             ),
+          ),
         ],
       ),
       body: LayoutBuilder(builder: (context, constraints) {
