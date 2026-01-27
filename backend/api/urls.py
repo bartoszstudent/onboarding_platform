@@ -5,7 +5,7 @@ from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet
 
 # Create a router and register our viewsets with it.
 router = DefaultRouter()
-router.register(r'courses', CourseViewSet)
+router.register(r'courses', CourseViewSet, basename='course')
 router.register(r'course-assignments', CourseAssignmentViewSet)
 router.register(r'companies', CompanyManagementViewSet, basename='company')
 router.register(r'competencies', CompetencyViewSet, basename='competency')

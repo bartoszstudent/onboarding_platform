@@ -240,15 +240,20 @@ def get_company(request, pk):
     serializer = CompanySerializer(company)
     return Response(serializer.data, status=status.HTTP_200_OK)
 class CourseViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows courses to be viewed or edited.
-    Provides CRUD operations for Courses.
-    """
-    queryset = Course.objects.all()
     serializer_class = CourseSerializer
-    # You should configure permissions, e.g., permissions.IsAuthenticated
-    # and check if the user is a 'mentor' or 'admin'
-    permission_classes = [permissions.AllowAny] # Change to IsAuthenticated later
+    # Zmieniamy AllowAny na IsAuthenticated, aby mieć dostęp do request.user
+    permission_classes = [permissions.IsAuthenticated] 
+
+    def get_queryset(self):
+        user = self.request.user
+        # Wersja 2: Bardziej jawna (czytelniejsza)
+        try:
+            # Pobieramy firmę użytkownika (zakładając relację OneToOne w UserCompany)
+            user_company = user.user_company 
+            return Course.objects.filter(workspace__company=user_company.company)
+        except (UserCompany.DoesNotExist, AttributeError):
+            # Jeśli użytkownik nie ma przypisanej firmy, nie widzi żadnych kursów
+            return Course.objects.none()
 
 class UserAssignedCoursesViewSet(viewsets.ReadOnlyModelViewSet):
     """
