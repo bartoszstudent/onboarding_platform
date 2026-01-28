@@ -21,7 +21,8 @@ from .models import (
     Quiz, Company, UserCompany, Question, Answer,
     Badge, UserBadge
 )
-
+from .permissions import IsCompanyAdmin
+from .models.competencies import Competency
 from .serializers import (
     CourseSerializer, 
     CourseAssignmentSerializer, 
@@ -30,16 +31,11 @@ from .serializers import (
     UserBadgeSerializer, 
     CompanyUserAddSerializer, 
     UserCompanyListSerializer, 
-    BulkCourseAssignmentSerializer
-    UserCompanyListSerializer,
     BulkCourseAssignmentSerializer,
-    CourseAssignmentSerializer,
     CompetencySerializer,
     CompetencyDetailSerializer
 )
 
-from .permissions import IsCompanyAdmin
-from .models.competencies import Competency
 
 User = get_user_model()
 
