@@ -51,12 +51,18 @@ class AuthService {
 
       final token = decoded['token']?.toString();
       final userMap = decoded['user'] as Map<String, dynamic>?;
+      final companyMap = decoded['company'] as Map<String, dynamic>?;
 
       if (token == null || userMap == null) {
         return false;
       }
 
-      final user = UserModel.fromJson(userMap);
+      final fullUserData = {
+        ...userMap,
+        'company': companyMap,
+      };
+
+      final user = UserModel.fromJson(fullUserData);
 
       // Zapis tokena
       await TokenManager.saveToken(token);
