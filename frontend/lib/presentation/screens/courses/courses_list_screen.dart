@@ -3,13 +3,16 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../data/services/auth_service.dart';
 import '../../ui/badge.dart' as app_ui;
-import 'course_mock_data.dart';
 import 'course_player_screen.dart';
 import 'course_create_screen.dart';
 import 'widgets/course_card.dart';
+import '../../../data/services/course_service.dart';
+import '../../../data/models/course_model.dart';
+
 
 class CoursesListScreen extends StatefulWidget {
   final String? role; // np. "admin", "hr", "employee"
+
   const CoursesListScreen({super.key, this.role});
 
   @override
@@ -19,6 +22,9 @@ class CoursesListScreen extends StatefulWidget {
 class _CoursesListScreenState extends State<CoursesListScreen> {
   String? _role;
 
+  List<Course> _courses = [];
+  bool _loading = true;
+
   @override
   void initState() {
     super.initState();
@@ -26,6 +32,7 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
     if (_role == null) {
       _loadRole();
     }
+    _loadCourses();
   }
 
   Future<void> _loadRole() async {
@@ -36,9 +43,29 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
     });
   }
 
+  Future<void> _loadCourses() async {
+    try {
+      final data = await CourseService.fetchCourses();
+      if (!mounted) return;
+      setState(() {
+        _courses = data;
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('Błąd ładowania kursów: $e');
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final courses = mockCourses;
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     final role = _role ?? 'employee';
 
@@ -50,30 +77,28 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
           if (role != 'employee') const app_ui.Badge(text: 'Admin')
         ]),
         actions: [
-          if (role == 'admin' || role == 'hr')
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const CourseCreateScreen()),
-                  );
-                },
-                icon: SvgPicture.asset('assets/icons/plus.svg',
-                    width: 18, height: 18, color: Colors.white),
-                label: const Text('Dodaj kurs'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Tokens.blue,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(Tokens.radius)),
-                ),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CourseCreateScreen()),
+                );
+              },
+              icon: SvgPicture.asset('assets/icons/plus.svg',
+                  width: 18, height: 18, color: Colors.white),
+              label: const Text('Dodaj kurs'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Tokens.blue,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(Tokens.radius)),
               ),
             ),
+          ),
         ],
       ),
       body: LayoutBuilder(builder: (context, constraints) {
@@ -93,19 +118,15 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
             mainAxisSpacing: 20,
             childAspectRatio: 0.9,
           ),
-          itemCount: courses.length,
+          itemCount: _courses.length,
           itemBuilder: (context, index) {
-            final course = courses[index];
+            final course = _courses[index];
             return CourseCard(
-              title: course['title'],
-              description: course['description'],
-              thumbnail: course['thumbnail'],
-              progress: course.containsKey('progress')
-                  ? (course['progress'] as int)
-                  : 0,
-              duration: course.containsKey('duration')
-                  ? course['duration'] as String?
-                  : null,
+              title: course.title,
+              description: course.description ?? '',
+              thumbnail: course.thumbnail ?? '',
+              progress: 0,
+              duration: course.duration ?? '',
               onTap: () {
                 Navigator.push(
                   context,

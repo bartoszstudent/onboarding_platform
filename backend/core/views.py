@@ -11,19 +11,28 @@ from rest_framework import viewsets, permissions, status, generics, views
 from .models.training import Course, CourseAssignment
 from .serializers import CourseSerializer, CourseAssignmentSerializer
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import AllowAny
-from .models import Quiz, Company, UserCompany, Answer
+from .models import Quiz, Company, UserCompany, Answer, Workspace, Course, CourseAssignment
 from .serializers import QuizDetailSerializer, CompanySerializer
-from rest_framework.permissions import AllowAny, IsAuthenticated # Added IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from .models import (
     Course, CourseAssignment, Question, Answer,
     Company, UserCompany, UserBadge, Badge, Quiz
 )
 from .serializers import (
     CourseSerializer, CourseAssignmentSerializer, 
-    QuizDetailSerializer, CompanySerializer, UserBadgeSerializer # Added UserBadgeSerializer
+    QuizDetailSerializer, CompanySerializer, UserBadgeSerializer,
+    CompanyUserAddSerializer, 
+    UserCompanyListSerializer,
+    BulkCourseAssignmentSerializer,
+    CompetencySerializer,
+    CompetencyDetailSerializer
 )
+from django.shortcuts import get_object_or_404
+from .models.workspaces import User
+from .permissions import IsCompanyAdmin
+from .models.competencies import Competency
 
 User = get_user_model()
 
@@ -236,15 +245,20 @@ def get_company(request, pk):
     serializer = CompanySerializer(company)
     return Response(serializer.data, status=status.HTTP_200_OK)
 class CourseViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows courses to be viewed or edited.
-    Provides CRUD operations for Courses.
-    """
-    queryset = Course.objects.all()
     serializer_class = CourseSerializer
-    # You should configure permissions, e.g., permissions.IsAuthenticated
-    # and check if the user is a 'mentor' or 'admin'
-    permission_classes = [permissions.AllowAny] # Change to IsAuthenticated later
+    # Zmieniamy AllowAny na IsAuthenticated, aby mieć dostęp do request.user
+    permission_classes = [permissions.IsAuthenticated] 
+
+    def get_queryset(self):
+        user = self.request.user
+        # Wersja 2: Bardziej jawna (czytelniejsza)
+        try:
+            # Pobieramy firmę użytkownika (zakładając relację OneToOne w UserCompany)
+            user_company = user.user_company 
+            return Course.objects.filter(workspace__company=user_company.company)
+        except (UserCompany.DoesNotExist, AttributeError):
+            # Jeśli użytkownik nie ma przypisanej firmy, nie widzi żadnych kursów
+            return Course.objects.none()
 
 class UserAssignedCoursesViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -317,9 +331,162 @@ class SubmitQuizView(views.APIView):
             "correct_answers": correct_answers,
             "score": round(score, 2)
         }, status=status.HTTP_200_OK)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_badges(request):
     user_badges = UserBadge.objects.filter(user=request.user)
     serializer = UserBadgeSerializer(user_badges, many=True)
     return Response(serializer.data)
+    
+class CompanyManagementViewSet(viewsets.ModelViewSet):
+    """
+    Zarządzanie ustawieniami firmy.
+    Tylko Admin firmy może edytować (PUT/PATCH).
+    """
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+    
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return [permissions.IsAuthenticated(), IsCompanyAdmin()]
+        return [permissions.AllowAny()] # Lub IsAuthenticated dla odczytu
+
+    # 1. Zarządzanie ustawieniami firmy (PUT/PATCH obsługiwane przez domyślne metody ModelViewSet)
+
+
+class CompanyUsersViewSet(viewsets.ViewSet):
+    # Zmieniamy na IsAuthenticated, aby każdy zalogowany mógł wywołać widok
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        # Sprawdzamy metodę requestu zamiast self.action, 
+        # aby uniknąć błędów gdy action nie jest jeszcze ustawione
+        if self.request.method in ['POST', 'DELETE']:
+            return [permissions.IsAuthenticated(), IsCompanyAdmin()]
+        return [permissions.IsAuthenticated()]
+
+    def list(self, request, company_pk=None):
+        """Pobieranie listy użytkowników - dostępne dla każdego członka firmy"""
+        # Sprawdzenie czy użytkownik należy do firmy o którą pyta (zabezpieczenie)
+        if not UserCompany.objects.filter(user=request.user, company_id=company_pk).exists():
+            return Response(
+                {"detail": "Nie masz uprawnień do przeglądania tej firmy."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        queryset = UserCompany.objects.filter(company_id=company_pk).select_related('user')
+        serializer = UserCompanyListSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, company_pk=None):
+        """Dodawanie użytkownika - wywoływane przez POST, chronione przez IsCompanyAdmin"""
+        # ... tutaj zostawiasz swoją logikę dodawania usera ...
+        return Response({"status": "user created"}, status=status.HTTP_201_CREATED)
+    
+    
+class CompanyCourseViewSet(viewsets.ViewSet):
+    """
+    Zarządzanie kursami w kontekście firmy.
+    Ścieżka: /api/companies/{company_pk}/courses/
+    """
+    permission_classes = [permissions.IsAuthenticated, IsCompanyAdmin]
+
+    # GET: Lista kursów firmy
+    def list(self, request, company_pk=None):
+        # Pobieramy workspace'y firmy, a potem kursy
+        workspaces = Workspace.objects.filter(company_id=company_pk)
+        courses = Course.objects.filter(workspace__in=workspaces)
+        serializer = CourseSerializer(courses, many=True)
+        return Response(serializer.data)
+
+    # POST: Dodawanie kursu w firmie
+    def create(self, request, company_pk=None):
+        # Wymagamy podania workspace_id, ale sprawdzamy czy należy do tej firmy
+        workspace_id = request.data.get('workspace')
+        
+        # Security check: czy workspace należy do firmy z URL?
+        if not Workspace.objects.filter(id=workspace_id, company_id=company_pk).exists():
+             return Response({"detail": "Invalid workspace for this company"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = CourseSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # ASSIGN: Przypisywanie użytkowników do kursu
+    @action(detail=False, methods=['post'], url_path='assign')
+    def assign_users(self, request, company_pk=None):
+        """
+        Body: { "course_id": 1, "user_ids": [10, 12, 15] }
+        """
+        serializer = BulkCourseAssignmentSerializer(data=request.data)
+        if serializer.is_valid():
+            course_id = serializer.validated_data['course_id']
+            user_ids = serializer.validated_data['user_ids']
+
+            # Weryfikacja: Czy kurs należy do tej firmy?
+            course = get_object_or_404(Course, pk=course_id)
+            if course.workspace.company.id != int(company_pk):
+                return Response({"detail": "Course does not belong to this company"}, status=status.HTTP_403_FORBIDDEN)
+
+            assignments = []
+            for uid in user_ids:
+                # Weryfikacja: Czy user jest w tej firmie?
+                if UserCompany.objects.filter(company_id=company_pk, user_id=uid).exists():
+                    # Unikamy duplikatów
+                    obj, created = CourseAssignment.objects.get_or_create(
+                        course=course,
+                        user_id=uid,
+                        defaults={
+                            'assigned_by_user': request.user,
+                            'status': 'assigned'
+                        }
+                    )
+                    assignments.append(obj)
+            
+            return Response({"assigned": len(assignments)}, status=status.HTTP_200_OK)
+            
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CompetencyViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for CRUD operations on Competencies.
+    
+    GET /api/competencies/ - list all competencies
+    POST /api/competencies/ - create new competency
+    GET /api/competencies/{id}/ - retrieve single competency with details
+    PUT /api/competencies/{id}/ - update competency
+    PATCH /api/competencies/{id}/ - partial update competency
+    DELETE /api/competencies/{id}/ - delete competency
+    
+    Body dla POST/PUT:
+    {
+      "workspace": 1,
+      "name": "Nazwa kompetencji",
+      "description": "Krótki opis kompetencji",
+      "courses": [1, 2, 3]  // IDs kursów
+    }
+    """
+    queryset = Competency.objects.all()
+    permission_classes = [permissions.AllowAny]  # Change to IsAuthenticated later
+    
+    def get_serializer_class(self):
+        # Użyj szczegółowego serializera dla retrieve (GET single)
+        if self.action == 'retrieve':
+            return CompetencyDetailSerializer
+        return CompetencySerializer
+    
+    def list(self, request, *args, **kwargs):
+        """List all competencies with their courses"""
+        queryset = self.get_queryset()
+        # Opcjonalnie filtruj po workspace
+        workspace_id = request.query_params.get('workspace', None)
+        if workspace_id:
+            queryset = queryset.filter(workspace_id=workspace_id)
+        
+        serializer = CompetencyDetailSerializer(queryset, many=True)
+        return Response(serializer.data)
+>>>>>>> e7cf2beb7dfdd7a2da0f969af2b98ca1742887bf

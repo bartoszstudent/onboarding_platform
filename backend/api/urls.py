@@ -1,19 +1,22 @@
 from django.contrib import admin
 from django.urls import path, include
-from django.conf import settings # Added import
-from django.conf.urls.static import static # Added import
+from django.conf import settings
+from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from core.views import (
     QuizDetailView, SubmitQuizView, login_view, CourseViewSet, 
     UserAssignedCoursesViewSet, CourseAssignmentViewSet, 
     create_company, list_companies, get_company,
-    my_badges # Added import
+    my_badges, CompanyManagementViewSet, CompanyUsersViewSet, 
+    CompanyCourseViewSet, CompetencyViewSet
 )
 
 # Create a router and register our viewsets with it.
 router = DefaultRouter()
-router.register(r'courses', CourseViewSet)
+router.register(r'courses', CourseViewSet, basename='course')
 router.register(r'course-assignments', CourseAssignmentViewSet)
+router.register(r'companies', CompanyManagementViewSet, basename='company')
+router.register(r'competencies', CompetencyViewSet, basename='competency')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -34,6 +37,14 @@ urlpatterns = [
 
     # Badges
     path('api/my-badges/', my_badges, name='my-badges'),
+    
+    # Company Users Management
+    path('companies/<int:company_pk>/users/', CompanyUsersViewSet.as_view({'get': 'list', 'post': 'create'})),
+    path('companies/<int:company_pk>/users/<int:pk>/', CompanyUsersViewSet.as_view({'delete': 'destroy'})),
+
+    # Company Courses Management
+    path('companies/<int:company_pk>/courses/', CompanyCourseViewSet.as_view({'get': 'list', 'post': 'create'})),
+    path('companies/<int:company_pk>/courses/assign/', CompanyCourseViewSet.as_view({'post': 'assign_users'})),
 ]
 
 # Serve media files in development

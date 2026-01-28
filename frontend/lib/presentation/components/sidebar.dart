@@ -35,6 +35,10 @@ class _SidebarState extends State<Sidebar> {
           asset: 'assets/icons/users.svg',
           label: 'Użytkownicy'));
       base.add(const _MenuItem(
+          path: '/branding_settings',
+          asset: 'assets/icons/settings.svg',
+          label: 'Personalizacja'));
+      base.add(const _MenuItem(
           path: '/settings',
           asset: 'assets/icons/settings.svg',
           label: 'Ustawienia'));

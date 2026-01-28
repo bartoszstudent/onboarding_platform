@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:onboarding_frontend/presentation/screens/companies/companies_list_screen.dart';
 import '../presentation/screens/login/login_screen_new.dart';
@@ -6,6 +5,9 @@ import '../presentation/screens/dashboard/dashboard_screen.dart';
 import '../presentation/layouts/main_layout.dart';
 import '../presentation/screens/courses/courses_list_screen.dart';
 import '../presentation/screens/users/users_list_screen.dart';
+import '../presentation/screens/settings/settings_screen.dart';
+import '../presentation/screens/branding_settings/branding_settings_screen.dart';
+
 import '../data/services/auth_service.dart';
 import '../data/services/auth_state.dart';
 
@@ -17,7 +19,7 @@ class AppRouter {
       final loggedIn = await AuthService.isLoggedIn();
       final role = await AuthService.getRole();
 
-      final goingToLogin = state.uri.path == '/';
+      final goingToLogin = state.location == '/';
 
       if (!loggedIn && !goingToLogin) {
         return '/';
@@ -32,14 +34,13 @@ class AppRouter {
       }
 
       if (role == 'user') {
-        if (state.uri.path == '/users' || state.uri.path == '/companies') {
+        if (state.location == '/users' || state.location == '/companies') {
           return '/dashboard';
         }
       }
 
       return null;
     },
-
     initialLocation: '/',
     routes: [
       GoRoute(
@@ -63,9 +64,12 @@ class AppRouter {
             builder: (context, state) => const UsersListScreen(),
           ),
           GoRoute(
+            path: '/branding_settings',
+            builder: (context, state) => const BrandingSettingsScreen(),
+          ),
+          GoRoute(
             path: '/settings',
-            builder: (context, state) => const Scaffold(
-                body: Center(child: Text('Ustawienia - placeholder'))),
+            builder: (context, state) => const OnboardingSettingsScreen(),
           ),
           GoRoute(
             path: '/companies',

@@ -10,7 +10,14 @@ final List<Map<String, dynamic>> mockCourses = [
         "content": [
           {"type": "text", "data": "Witaj w firmie Onboardly!"},
           {"type": "image", "data": "https://picsum.photos/600/300?welcome"},
-          {"type": "quiz", "data": {"question": "Jak się nazywa firma?", "answers": ["Onboardly", "Offboardly"], "correct": 0}}
+          {
+            "type": "quiz",
+            "data": {
+              "question": "Jak się nazywa firma?",
+              "answers": ["Onboardly", "Offboardly", "Boardly", "Onboard Plus"],
+              "correct": 0
+            }
+          }
         ]
       }
     ]
@@ -20,6 +27,24 @@ final List<Map<String, dynamic>> mockCourses = [
     "title": "Bezpieczeństwo w pracy",
     "description": "Poznaj zasady bezpieczeństwa i higieny pracy.",
     "thumbnail": "https://picsum.photos/400/200?2",
-    "sections": []
+    "sections": [
+      {
+        "title": "Zasady bezpieczeństwa",
+        "content": [
+          {
+            "type": "text",
+            "data": "Oto główne zasady bezpieczeństwa w naszej firmie..."
+          },
+          {
+            "type": "quiz",
+            "data": {
+              "question": "Ile czasu powinno się myć ręce?",
+              "answers": ["10 sekund", "20 sekund", "30 sekund", "1 minuta"],
+              "correct": 1
+            }
+          }
+        ]
+      }
+    ]
   }
 ];
