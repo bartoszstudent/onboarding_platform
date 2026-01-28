@@ -33,11 +33,9 @@ urlpatterns = [
 
     path('api/my-badges/', my_badges, name='my-badges'),
 
-    # User Management
     path('companies/<int:company_pk>/users/', CompanyUsersViewSet.as_view({'get': 'list', 'post': 'create'}), name='company-users'),
     path('companies/<int:company_pk>/users/<int:pk>/', CompanyUsersViewSet.as_view({'delete': 'destroy'}), name='company-user-delete'),
 
-    # Course Management
     path('companies/<int:company_pk>/courses/', CompanyCourseViewSet.as_view({'get': 'list', 'post': 'create'}), name='company-courses'),
     path('companies/<int:company_pk>/courses/assign/', CompanyCourseViewSet.as_view({'post': 'assign_users'}), name='company-course-assign'),
 ]
