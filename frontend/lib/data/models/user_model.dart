@@ -3,12 +3,14 @@ class UserModel {
   final String email;
   final String name;
   final String role;
+  final int? companyId;
 
   UserModel({
     required this.id,
     required this.email,
     required this.name,
     required this.role,
+    this.companyId,
   });
 
   /// Tworzy model na podstawie JSON-a z backendu.
@@ -22,7 +24,8 @@ class UserModel {
   ///   "role": "admin"
   /// }
   factory UserModel.fromJson(Map<String, dynamic> json) {
-    final firstName = (json['first_name'] ?? json['firstName'] ?? '').toString();
+    final firstName =
+        (json['first_name'] ?? json['firstName'] ?? '').toString();
     final lastName = (json['last_name'] ?? json['lastName'] ?? '').toString();
     String name;
 
@@ -45,6 +48,9 @@ class UserModel {
       email: json['email']?.toString() ?? '',
       name: name,
       role: json['role']?.toString() ?? 'employee',
+      companyId: json['company_id'] != null
+          ? (json['company_id'] as num).toInt()
+          : null,
     );
   }
 
@@ -54,6 +60,7 @@ class UserModel {
       'email': email,
       'name': name,
       'role': role,
+      'company_id': companyId,
     };
   }
 }

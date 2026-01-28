@@ -17,8 +17,22 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  late FocusNode _passwordFocus;
   bool _loading = false;
+  bool _showPassword = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordFocus = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _passwordFocus.dispose();
+    super.dispose();
+  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -67,6 +81,8 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
                   AppInput(
                     controller: _email,
                     hintText: 'twoj@email.com',
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
                     validator: (v) => (v == null || v.isEmpty)
                         ? 'Podaj email'
                         : (!v.contains('@') ? 'Nieprawidłowy email' : null),
@@ -76,8 +92,19 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
                   const SizedBox(height: 6),
                   AppInput(
                     controller: _password,
+                    focusNode: _passwordFocus,
                     hintText: '********',
-                    obscureText: true,
+                    obscureText: !_showPassword,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _submit(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _showPassword ? Icons.visibility : Icons.visibility_off,
+                        color: Colors.grey[600],
+                      ),
+                      onPressed: () =>
+                          setState(() => _showPassword = !_showPassword),
+                    ),
                     validator: (v) => (v == null || v.length < 6)
                         ? 'Hasło musi mieć min. 6 znaków'
                         : null,
