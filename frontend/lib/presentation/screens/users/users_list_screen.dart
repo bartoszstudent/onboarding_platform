@@ -3,6 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../data/services/auth_service.dart';
+import '../../../core/utils/token_manager.dart';
+
 import '../../../core/constants/design_tokens.dart';
 import '../../../data/services/api_client.dart';
 
@@ -34,16 +37,30 @@ class _UsersListScreenState extends State<UsersListScreen> {
   }
 
   Future<List<Map<String, dynamic>>> _fetchUsers() async {
-  final response = await ApiClient.get('api/companies/me/users/');
+  final user = await AuthService.getCurrentUser();
+  final token = await TokenManager.getToken();
+  
+  final companyId = user?.companyId; 
+
+  if (companyId == null) {
+    throw Exception('Nie znaleziono identyfikatora firmy dla użytkownika.');
+  }
+
+  final response = await ApiClient.get(
+    'companies/$companyId/users/',
+    headers: {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    },
+  );
 
   if (response.statusCode != 200) {
-    throw Exception('Błąd pobierania użytkowników');
+    throw Exception('Błąd pobierania użytkowników: ${response.statusCode}');
   }
 
   final List data = jsonDecode(response.body);
   return data.cast<Map<String, dynamic>>();
 }
-
   String _roleLabel(String role) {
     switch (role) {
       case 'super-admin':
