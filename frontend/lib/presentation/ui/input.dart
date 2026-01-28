@@ -7,6 +7,8 @@ class AppInput extends StatelessWidget {
   final bool obscureText;
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final void Function(String)? onFieldSubmitted;
   final int? maxLines;
 
   const AppInput(
@@ -17,15 +19,19 @@ class AppInput extends StatelessWidget {
       this.obscureText = false,
       this.validator,
       this.keyboardType,
+      this.textInputAction,
+      this.onFieldSubmitted,
       this.maxLines});
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
-      obscureText: obscureText,
+      obscureText: obscureText, 
       validator: validator,
       keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      onFieldSubmitted: onFieldSubmitted,
       maxLines: obscureText ? 1 : maxLines,
       decoration: InputDecoration(
         // Prefer showing a stationary placeholder. If a labelText was

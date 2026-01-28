@@ -67,6 +67,7 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
                   AppInput(
                     controller: _email,
                     hintText: 'twoj@email.com',
+                    textInputAction: TextInputAction.next,
                     validator: (v) => (v == null || v.isEmpty)
                         ? 'Podaj email'
                         : (!v.contains('@') ? 'Nieprawidłowy email' : null),
@@ -78,6 +79,8 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
                     controller: _password,
                     hintText: '********',
                     obscureText: true,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _submit(),
                     validator: (v) => (v == null || v.length < 6)
                         ? 'Hasło musi mieć min. 6 znaków'
                         : null,
