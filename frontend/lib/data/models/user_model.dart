@@ -3,14 +3,22 @@ class UserModel {
   final String email;
   final String name;
   final String role;
+<<<<<<<<< Temporary merge branch 1
   final int? companyId;
+=========
+  final int? companyId; 
+>>>>>>>>> Temporary merge branch 2
 
   UserModel({
     required this.id,
     required this.email,
     required this.name,
     required this.role,
+<<<<<<<<< Temporary merge branch 1
     this.companyId,
+=========
+    this.companyId, 
+>>>>>>>>> Temporary merge branch 2
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -45,7 +53,13 @@ class UserModel {
       email: json['email']?.toString() ?? '',
       name: name,
       role: json['role']?.toString() ?? 'employee',
-      companyId: extractedCompanyId,
+<<<<<<<<< Temporary merge branch 1
+      companyId: json['company_id'] != null
+          ? (json['company_id'] as num).toInt()
+          : null,
+=========
+      companyId: extractedCompanyId, 
+>>>>>>>>> Temporary merge branch 2
     );
   }
 
@@ -55,11 +69,11 @@ class UserModel {
       'email': email,
       'name': name,
       'role': role,
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
       'company_id': companyId,
-=======
+=========
       'company_id': companyId, 
->>>>>>> main
+>>>>>>>>> Temporary merge branch 2
     };
   }
 }
