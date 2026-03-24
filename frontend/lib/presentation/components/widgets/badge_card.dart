@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants/design_tokens.dart';
-import '../../data/models/badge_list_item.dart';
+import '../../../core/constants/design_tokens.dart';
+import '../../../data/models/badge_list_item.dart';
 
 class _Palette {
   final Color bg;
