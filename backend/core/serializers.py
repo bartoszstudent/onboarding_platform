@@ -27,13 +27,23 @@ User = get_user_model()
 class CourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
-        fields = ['id', 'workspace', 'title']
+        fields = ['id', 'workspace', 'title', 'completion_badge']
 
 class CourseAssignmentSerializer(serializers.ModelSerializer):
+    badge_id = serializers.IntegerField(write_only=True, required=False)
+
     class Meta:
         model = CourseAssignment
-        fields = ['id', 'course', 'user', 'assigned_by_user', 'status']
+        fields = ['id', 'course', 'user', 'assigned_by_user', 'status', 'badge_id']
         read_only_fields = ['assigned_by_user'] # Set automatically
+
+    def update(self, instance, validated_data):
+        validated_data.pop('badge_id', None)
+        return super().update(instance, validated_data)
+
+    def create(self, validated_data):
+        validated_data.pop('badge_id', None)
+        return super().create(validated_data)
 from .models import Quiz, Question, Answer
 
 class AnswerSerializer(serializers.ModelSerializer):

@@ -8,6 +8,13 @@ from .workspaces import Workspace
 class Course(models.Model):
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
+    completion_badge = models.ForeignKey(
+        'core.Badge',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='courses_with_completion_badge',
+    )
 
     def __str__(self):
         return self.title

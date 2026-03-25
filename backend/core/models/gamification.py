@@ -13,6 +13,11 @@ class UserBadge(models.Model):
     badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['badge', 'user'], name='uniq_user_badge')
+        ]
+
 
 class MentorRating(models.Model):
     mentor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
