@@ -8,12 +8,13 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from rest_framework import viewsets, permissions, status, generics, views
+from rest_framework.exceptions import ValidationError
 from .models.training import Course, CourseAssignment
 from .serializers import CourseSerializer, CourseAssignmentSerializer
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import AllowAny
-from .models import Quiz, Company, UserCompany, Answer, Workspace, Course, CourseAssignment
+from .models import Quiz, Company, UserCompany, Answer, Workspace, Course, CourseAssignment, Badge, UserBadge
 from .serializers import QuizDetailSerializer, CompanySerializer
 from django.shortcuts import get_object_or_404
 from .models.workspaces import User  # lub get_user_model()
@@ -283,6 +284,39 @@ class CourseAssignmentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Set the 'assigned_by_user' to the current user automatically
         serializer.save(assigned_by_user=self.request.user)
+
+    def _resolve_badge_for_completion(self, assignment, badge_id):
+        if badge_id is not None and badge_id != '':
+            try:
+                badge = Badge.objects.get(pk=int(badge_id))
+            except (TypeError, ValueError):
+                raise ValidationError({'badge_id': 'badge_id musi być liczbą całkowitą.'})
+            except Badge.DoesNotExist:
+                raise ValidationError({'badge_id': 'Nie znaleziono odznaki o podanym ID.'})
+        else:
+            badge = assignment.course.completion_badge
+
+        if badge is None:
+            return None
+
+        if badge.workspace_id != assignment.course.workspace_id:
+            raise ValidationError({'badge_id': 'Odznaka musi należeć do tego samego workspace co kurs.'})
+
+        return badge
+
+    def perform_update(self, serializer):
+        assignment = serializer.instance
+        target_status = (serializer.validated_data.get('status', assignment.status) or '').lower()
+        badge = None
+
+        if target_status == 'completed':
+            badge = self._resolve_badge_for_completion(assignment, self.request.data.get('badge_id'))
+
+        assignment = serializer.save()
+
+        if target_status == 'completed' and badge is not None:
+            # Idempotentne przypisanie - brak duplikatów przy kolejnych update'ach.
+            UserBadge.objects.get_or_create(user=assignment.user, badge=badge)
 
 # --- View to get a full quiz with questions and answers ---
 class QuizDetailView(generics.RetrieveAPIView):
