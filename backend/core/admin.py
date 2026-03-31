@@ -51,9 +51,9 @@ class CompetencyAdmin(admin.ModelAdmin):
 
 # --- Admin classes for Badges ---
 class BadgeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'workspace', 'description')
-    list_filter = ('workspace',)
-    search_fields = ('name', 'description')
+    list_display = ('name', 'course', 'description') 
+    list_filter = ('course__workspace',) 
+    search_fields = ('name', 'description', 'course__title')
 
 class UserBadgeAdmin(admin.ModelAdmin):
     list_display = ('user', 'badge')

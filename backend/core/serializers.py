@@ -12,7 +12,8 @@ class BadgeSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = Badge
-        fields = '__all__'
+        fields = ['id', 'course', 'name', 'description', 'image']
+
 
 class CompanySerializer(serializers.ModelSerializer):
     """Serializer do tworzenia i pobierania firm"""

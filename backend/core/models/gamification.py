@@ -2,11 +2,15 @@ from django.db import models
 from django.conf import settings
 from .workspaces import Workspace
 from .onboarding import OnboardingTaskInstance
+from .training import Course
 
 
 class Badge(models.Model):
-    workspace = models.ForeignKey(
-        Workspace, on_delete=models.CASCADE, related_name="badges"
+    # This field links a Badge directly and uniquely to one Course
+    course = models.OneToOneField(
+        Course, 
+        on_delete=models.CASCADE, 
+        related_name="badge"
     )
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
