@@ -4,6 +4,15 @@ from django.contrib.auth import get_user_model
 from .models.workspaces import Company
 from .models import UserCompany, Company, CourseAssignment
 from .models.competencies import Competency, CompetencyCourse
+from .models import Badge
+
+class BadgeSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the Badge model.
+    """
+    class Meta:
+        model = Badge
+        fields = '__all__'
 
 class CompanySerializer(serializers.ModelSerializer):
     """Serializer do tworzenia i pobierania firm"""
