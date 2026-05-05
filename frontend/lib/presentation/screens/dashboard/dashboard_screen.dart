@@ -512,51 +512,6 @@ class _Badge {
   _Badge(this.name, this.description, this.iconPath, this.earned);
 }
 
-// Widget _badgeBox(_Badge b) {
-//   return Container(
-//     padding: const EdgeInsets.all(8),
-//     decoration: BoxDecoration(
-//       color: b.earned
-//           ? Colors.blue.withOpacity(0.08)
-//           : Colors.grey.withOpacity(0.1),
-//       borderRadius: BorderRadius.circular(12),
-//     ),
-//     child: Column(
-//       crossAxisAlignment: CrossAxisAlignment.start,
-//       children: [
-//         Row(
-//           children: [
-//             SvgPicture.asset(
-//               b.iconPath,
-//               width: 14,
-//               height: 14,
-//               colorFilter: ColorFilter.mode(
-//                 b.earned ? Colors.blue : Colors.grey,
-//                 BlendMode.srcIn,
-//               ),
-//             ),
-//             const Spacer(),
-//             if (!b.earned)
-//               const Icon(Icons.lock, size: 14, color: Colors.grey),
-//           ],
-//         ),
-//         const SizedBox(height: 8),
-//         Text(
-//           b.name,
-//           style: TextStyle(
-//             fontSize: 11,
-//             color: b.earned ? Colors.black : Colors.grey,
-//           ),
-//         ),
-//         const SizedBox(height: 4),
-//         Text(
-//           b.description,
-//           style: const TextStyle(fontSize: 9),
-//         ),
-//       ],
-//     ),
-//   );
-// }
 Widget _badgeBox(_Badge b) {
   return Container(
     padding: const EdgeInsets.all(8),
