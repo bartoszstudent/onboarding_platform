@@ -178,7 +178,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+          colors: [Tokens.blue700, Tokens.blueHover],
         ),
         borderRadius: BorderRadius.circular(Tokens.radius2xl),
         boxShadow: Tokens.shadowSm,
@@ -199,7 +199,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Tokens.background,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.edit, size: 14),
@@ -215,14 +215,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               children: [
                 Text(fullName,
                     style: const TextStyle(
-                        color: Colors.white,
+                        color: Tokens.background,
                         fontSize: 18,
                         fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 Text(user!.email,
-                    style: const TextStyle(color: Colors.white70)),
+                    style: const TextStyle(color: Tokens.muted)),
                 Text(roleLabels[user!.role] ?? user!.role,
-                    style: const TextStyle(color: Colors.white70)),
+                    style: const TextStyle(color: Tokens.muted)),
               ],
             ),
           ),
@@ -231,11 +231,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             padding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white24,
+              color: Tokens.mutedForeground,
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Text('Edytuj profil',
-                style: TextStyle(color: Colors.white)),
+                style: TextStyle(color: Tokens.background)),
           )
         ],
       ),
@@ -376,7 +376,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         "Ogólny postęp",
                         style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade800,
+                            color: Tokens.gray700,
                             fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 6),
@@ -385,8 +385,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 .map((c) => c['progress'] as int)
                                 .reduce((a, b) => a + b) /
                             (mockCourses.length * 100),
-                        color: Colors.blue.shade600,
-                        backgroundColor: Colors.white,
+                        color: Tokens.blue,
+                        backgroundColor: Tokens.background,
                         minHeight: 8,
                       ),
                       const SizedBox(height: 6),
@@ -415,13 +415,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     Color statusColor;
                     if (progress == 100) {
                       status = 'Ukończony';
-                      statusColor = Colors.green;
+                      statusColor = Tokens.green700;
                     } else if (progress == 0) {
                       status = 'Nierozpoczęty';
-                      statusColor = Colors.grey;
+                      statusColor = Tokens.mutedForeground;
                     } else {
                       status = 'W trakcie';
-                      statusColor = Colors.blue;
+                      statusColor = Tokens.blue;
                     }
 
                     return Padding(
@@ -481,21 +481,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                     children: [
                                       Text(
                                         "${c['completedLessons']} / ${c['totalLessons']} lekcji",
-                                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                        style: const TextStyle(fontSize: 11, color: Tokens.mutedForeground),
                                       ),
                                       const SizedBox(width: 8),
                                       if (c['estimatedTime'] != null &&
                                           c['estimatedTime'].toString().isNotEmpty)
                                         Text(
                                           c['estimatedTime'],
-                                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                          style: const TextStyle(fontSize: 11, color: Tokens.mutedForeground),
                                         ),
                                     ],
-                                  ),
-                                  Text(
-                                    "$progress%",
-                                    style: TextStyle(
-                                        fontSize: 11, color: statusColor, fontWeight: FontWeight.w500),
                                   ),
                                 ],
                               ),
@@ -506,7 +501,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 Text(
                                   "Następnie: ${c['nextLesson']}",
                                   style: const TextStyle(
-                                      fontSize: 11, color: Colors.grey),
+                                      fontSize: 11, color: Tokens.mutedForeground),
                                 ),
                               const SizedBox(height: 6),
                               if (progress < 100)
@@ -515,7 +510,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                   child: ElevatedButton(
                                     onPressed: () {},
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue,
+                                      backgroundColor: Tokens.blue,
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 10),
                                       shape: RoundedRectangleBorder(
@@ -545,7 +540,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: Tokens.blue100,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
