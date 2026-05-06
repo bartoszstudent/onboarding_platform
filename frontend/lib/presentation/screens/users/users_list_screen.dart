@@ -103,14 +103,17 @@ class _UsersListScreenState extends State<UsersListScreen> {
       future: _usersFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
 
         if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              snapshot.error.toString(),
-              style: const TextStyle(color: Colors.red),
+          debugPrint(snapshot.error.toString());
+          
+          return const Scaffold(
+            body: Center(
+              child: Text('Nie udało się załadować danych'),
             ),
           );
         }
@@ -128,6 +131,14 @@ class _UsersListScreenState extends State<UsersListScreen> {
 
           return matchesSearch && matchesRole;
         }).toList();
+
+        if (filtered.isEmpty) {
+          return const Scaffold(
+            body: Center(
+              child: Text('Brak użytkowników do wyświetlenia'),
+            ),
+          );
+        }
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
