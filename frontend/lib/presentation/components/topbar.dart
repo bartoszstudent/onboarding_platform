@@ -5,6 +5,7 @@ import '../components/user_avatar.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../data/services/auth_service.dart';
 import 'widgets/notification_panel.dart';
+import '../screens/profile/user_profile_screen.dart';
 
 class Topbar extends StatefulWidget {
   Topbar({super.key});
@@ -16,6 +17,10 @@ class Topbar extends StatefulWidget {
 class _TopbarState extends State<Topbar> {
 
   final GlobalKey _bellKey = GlobalKey();
+
+  void _goToProfile(BuildContext context) {
+    GoRouter.of(context).push('/profile');
+  }
 
   void _toggleNotifications(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
@@ -100,7 +105,10 @@ class _TopbarState extends State<Topbar> {
               icon: SvgPicture.asset('assets/icons/bell.svg',
                   width: 20, height: 20, color: Colors.black54)),
           const SizedBox(width: 8),
-          const UserAvatar(),
+          GestureDetector(
+            onTap: () => _goToProfile(context),
+            child: const UserAvatar(),
+          ),
           const SizedBox(width: 8),
           PopupMenuButton<int>(
             itemBuilder: (context) => [
@@ -108,6 +116,10 @@ class _TopbarState extends State<Topbar> {
               const PopupMenuItem(value: 2, child: Text('Wyloguj')),
             ],
             onSelected: (v) async {
+              if (v == 1) {
+                _goToProfile(context);
+              }
+
               if (v == 2) {
                 await AuthService.logout();
                 if (!context.mounted) return;

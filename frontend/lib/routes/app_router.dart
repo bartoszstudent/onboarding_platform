@@ -7,7 +7,7 @@ import '../presentation/screens/courses/courses_list_screen.dart';
 import '../presentation/screens/users/users_list_screen.dart';
 import '../presentation/screens/settings/settings_screen.dart';
 import '../presentation/screens/branding_settings/branding_settings_screen.dart';
-
+import '../presentation/screens/profile/user_profile_screen.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/auth_state.dart';
 
@@ -53,6 +53,10 @@ class AppRouter {
           GoRoute(
             path: '/dashboard',
             builder: (context, state) => const DashboardScreen(),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const UserProfileScreen(),
           ),
           GoRoute(
             path: '/courses',
