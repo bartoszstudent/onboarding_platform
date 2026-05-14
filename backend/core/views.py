@@ -25,8 +25,11 @@ from .serializers import (
     BulkCourseAssignmentSerializer,
     CourseAssignmentSerializer,
     CompetencySerializer,
-    CompetencyDetailSerializer
+    CompetencyDetailSerializer,
+    BadgeSerializer
 )
+
+from .models import Badge
 from .permissions import IsCompanyAdmin
 from .models.competencies import Competency
 
@@ -35,6 +38,12 @@ User = get_user_model()
 # ile sekund ważny jest token (tu: 7 dni)
 AUTH_TOKEN_MAX_AGE = 60 * 60 * 24 * 7  # 7 dni
 
+class BadgeViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows badges to be viewed or edited.
+    """
+    queryset = Badge.objects.all()
+    serializer_class = BadgeSerializer
 
 def _generate_token(user) -> str:
     """
