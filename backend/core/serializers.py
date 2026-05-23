@@ -92,10 +92,18 @@ class UserCompanyListSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(source='user.first_name')
     last_name = serializers.CharField(source='user.last_name')
     user_id = serializers.IntegerField(source='user.id')
+    courses_count = serializers.SerializerMethodField()
 
     class Meta:
         model = UserCompany
-        fields = ['id', 'user_id', 'email', 'first_name', 'last_name', 'role']
+        fields = ['id', 'user_id', 'email', 'first_name', 'last_name', 'role', 'courses_count']
+
+    def get_courses_count(self, obj):
+        # Liczymy przypisania kursów dla użytkownika (CourseAssignment)
+        try:
+            return CourseAssignment.objects.filter(user=obj.user).count()
+        except Exception:
+            return 0
 
 # --- Serializery do Przypisywania Kursów ---
 
