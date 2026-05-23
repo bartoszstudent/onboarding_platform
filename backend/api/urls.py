@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet, UserAssignedCoursesViewSet, CourseAssignmentViewSet, create_company, list_companies, get_company, CompanyManagementViewSet, CompanyUsersViewSet, CompanyCourseViewSet, CompetencyViewSet
+from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet, UserAssignedCoursesViewSet, CourseAssignmentViewSet, create_company, list_companies, get_company, CompanyManagementViewSet, CompanyUsersViewSet, CompanyCourseViewSet, CompetencyViewSet, get_quiz_for_course
 from core.views import BadgeViewSet
 
 # Create a router and register our viewsets with it.
@@ -27,6 +27,8 @@ urlpatterns = [
     
     # URL to submit answers for a quiz
     path('api/quizzes/<int:pk>/submit/', SubmitQuizView.as_view(), name='quiz-submit'),
+    # Get quiz for a specific course
+    path('api/courses/<int:course_id>/quiz/', get_quiz_for_course, name='course-quiz'),
     # 1. Zarządzanie użytkownikami: GET list, POST add
     path('companies/<int:company_pk>/users/', CompanyUsersViewSet.as_view({'get': 'list', 'post': 'create'})),
     # DELETE user (usuwanie relacji)
