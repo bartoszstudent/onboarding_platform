@@ -8,6 +8,9 @@ from .workspaces import Workspace
 class Course(models.Model):
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    thumbnail = models.URLField(blank=True, null=True)
+    duration = models.CharField(max_length=100, blank=True, null=True)
     completion_badge = models.ForeignKey(
         'core.Badge',
         on_delete=models.SET_NULL,
