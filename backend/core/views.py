@@ -14,10 +14,14 @@ from .serializers import CourseSerializer, CourseAssignmentSerializer
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import AllowAny
-from .models import Quiz, Company, UserCompany, Answer, Workspace, Course, CourseAssignment, Badge, UserBadge
+from .models import Quiz, Company, UserCompany, Answer, Workspace, Course, CourseAssignment, Badge, UserBadge 
 from .serializers import QuizDetailSerializer, CompanySerializer
 from django.shortcuts import get_object_or_404
 from .models.workspaces import User  # lub get_user_model()
+from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
+from core.models import Section
+from core.models import SectionProgress
 from .serializers import ( 
     CourseSerializer, 
     CompanyUserAddSerializer, 
@@ -520,3 +524,64 @@ class CompetencyViewSet(viewsets.ModelViewSet):
         
         serializer = CompetencyDetailSerializer(queryset, many=True)
         return Response(serializer.data)
+
+class SectionProgressView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """
+        Expects JSON:
+        {
+          "course_id": int,
+          "section_id": int,
+          "completed": bool
+        }
+        """
+        data = request.data
+        user = request.user
+
+        course_id = data.get("course_id")
+        section_id = data.get("section_id")
+        completed_flag = bool(data.get("completed", False))
+
+        # Validate + fetch
+        course = get_object_or_404(Course, pk=course_id)
+        section = get_object_or_404(Section, pk=section_id)
+
+        # Ensure section belongs to course
+        if section.course_id != course.id:
+            return Response(
+                {"detail": "Section does not belong to this course."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        assignment = get_object_or_404(CourseAssignment, user=user, course=course)
+
+        sp, _ = SectionProgress.objects.update_or_create(
+            assignment=assignment,
+            section=section,
+            defaults={"completed": completed_flag},
+        )
+
+        total_sections = Section.objects.filter(course=course).count()
+        completed_sections = SectionProgress.objects.filter(
+            assignment=assignment, completed=True
+        ).count()
+        progress = int((completed_sections / total_sections) * 100) if total_sections else 0
+
+        # Keep your existing "status" approach (string field on CourseAssignment)
+        assignment.status = f"{progress}% complete"
+        assignment.save(update_fields=["status"])
+
+        return Response(
+            {
+                "course_id": course.id,
+                "section_id": section.id,
+                "completed": sp.completed,
+                "progress": progress,
+                "status": assignment.status,
+                "total_sections": total_sections,
+                "completed_sections": completed_sections,
+            },
+            status=status.HTTP_200_OK,
+        )

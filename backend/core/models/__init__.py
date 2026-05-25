@@ -46,4 +46,5 @@ __all__ = [
     'UserBadge',
     'MentorRating',
     'Notification',
+    'SectionProgress'
 ]
