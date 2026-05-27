@@ -37,7 +37,15 @@ User = get_user_model()
 class CourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
-        fields = ['id', 'workspace', 'title', 'completion_badge']
+        fields = [
+            'id',
+            'workspace',
+            'title',
+            'description',
+            'thumbnail',
+            'duration',
+            'completion_badge',
+        ]
 
 class CourseAssignmentSerializer(serializers.ModelSerializer):
     badge_id = serializers.IntegerField(write_only=True, required=False)
