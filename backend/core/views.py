@@ -569,7 +569,6 @@ class SectionProgressView(APIView):
         ).count()
         progress = int((completed_sections / total_sections) * 100) if total_sections else 0
 
-        # Keep your existing "status" approach (string field on CourseAssignment)
         assignment.status = f"{progress}% complete"
         assignment.save(update_fields=["status"])
 
