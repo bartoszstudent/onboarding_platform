@@ -374,6 +374,31 @@ class SubmitQuizView(views.APIView):
             "score": round(score, 2)
         }, status=status.HTTP_200_OK)
     
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_quiz_for_course(request, course_id):
+    """
+    Znajduje quiz powiązany z kursem. Przeszukuje bloki w sekcjach kursu i
+    zwraca pierwszy napotkany quiz (jeśli istnieje).
+    """
+    try:
+        course = Course.objects.get(pk=course_id)
+    except Course.DoesNotExist:
+        return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Szukamy pierwszego bloku, który ma przypisany quiz w sekcjach tego kursu
+    from .models import Block
+
+    block = Block.objects.filter(section__course=course, quiz__isnull=False).select_related('quiz').first()
+
+    if not block or not block.quiz:
+        return Response({"detail": "Quiz not found for this course."}, status=status.HTTP_404_NOT_FOUND)
+
+    quiz = block.quiz
+    serializer = QuizDetailSerializer(quiz)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
 class CompanyManagementViewSet(viewsets.ModelViewSet):
     """
     Zarządzanie ustawieniami firmy.
