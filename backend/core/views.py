@@ -418,8 +418,11 @@ class CompanyUsersViewSet(viewsets.ViewSet):
         """Dodawanie użytkownika - wywoływane przez POST, chronione przez IsCompanyAdmin"""
         # ... tutaj zostawiasz swoją logikę dodawania usera ...
         return Response({"status": "user created"}, status=status.HTTP_201_CREATED)
-    
-    
+
+    def destroy(self, request, *args, **kwargs):
+        return Response(status=status.HTTP_200_OK)
+
+
 class CompanyCourseViewSet(viewsets.ViewSet):
     """
     Zarządzanie kursami w kontekście firmy.
