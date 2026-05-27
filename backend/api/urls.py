@@ -3,6 +3,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet, UserAssignedCoursesViewSet, CourseAssignmentViewSet, create_company, list_companies, get_company, CompanyManagementViewSet, CompanyUsersViewSet, CompanyCourseViewSet, CompetencyViewSet
 from core.views import BadgeViewSet
+from core.views import SectionProgressView
 
 # Create a router and register our viewsets with it.
 router = DefaultRouter()
@@ -37,4 +38,6 @@ urlpatterns = [
     
     # 3. Przypisywanie do kursu: POST assign
     path('companies/<int:company_pk>/courses/assign/', CompanyCourseViewSet.as_view({'post': 'assign_users'})),
+
+    path('api/section-progress/', SectionProgressView.as_view(), name='section-progress'),
 ]

@@ -59,6 +59,11 @@ class UserBadgeAdmin(admin.ModelAdmin):
     list_display = ('user', 'badge')
     list_filter = ('user', 'badge')
 
+class SectionProgressAdmin(admin.ModelAdmin):
+    list_display = ("assignment", "section", "completed")
+    list_filter = ("completed", "assignment__course", "section__course")
+    search_fields = ("assignment__user__username", "assignment__course__title", "section__title")
+
 # Register your models here to see them in the admin UI.
 # This will now work because __init__.py is correctly configured.
 admin.site.register(models.Company)
@@ -77,3 +82,4 @@ admin.site.register(models.Competency, CompetencyAdmin)
 admin.site.register(models.CompetencyCourse, CompetencyCourseAdmin)
 admin.site.register(models.Badge, BadgeAdmin)
 admin.site.register(models.UserBadge, UserBadgeAdmin)
+admin.site.register(models.SectionProgress, SectionProgressAdmin)

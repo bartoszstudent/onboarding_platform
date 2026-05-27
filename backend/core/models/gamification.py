@@ -6,11 +6,12 @@ from .training import Course
 
 
 class Badge(models.Model):
-    # This field links a Badge directly and uniquely to one Course
     course = models.OneToOneField(
-        Course, 
-        on_delete=models.CASCADE, 
-        related_name="badge"
+        Course,
+        on_delete=models.CASCADE,
+        related_name="badge",
+        null=True,     # <-- add
+        blank=True,    # <-- add
     )
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
