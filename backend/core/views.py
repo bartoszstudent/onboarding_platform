@@ -20,8 +20,8 @@ from django.shortcuts import get_object_or_404
 from .models.workspaces import User  # lub get_user_model()
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from core.models import Section
-from core.models import SectionProgress
+from .models.progress import SectionProgress
+from .models.section import Section
 from .serializers import ( 
     CourseSerializer, 
     CompanyUserAddSerializer, 
@@ -529,58 +529,40 @@ class SectionProgressView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        """
-        Expects JSON:
-        {
-          "course_id": int,
-          "section_id": int,
-          "completed": bool
-        }
-        """
         data = request.data
         user = request.user
 
-        course_id = data.get("course_id")
-        section_id = data.get("section_id")
-        completed_flag = bool(data.get("completed", False))
+        course = get_object_or_404(Course, pk=data.get("course_id"))
+        section = get_object_or_404(Section, pk=data.get("section_id"))
 
-        # Validate + fetch
-        course = get_object_or_404(Course, pk=course_id)
-        section = get_object_or_404(Section, pk=section_id)
-
-        # Ensure section belongs to course
+        # optional safety check
         if section.course_id != course.id:
-            return Response(
-                {"detail": "Section does not belong to this course."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({"detail": "Section does not belong to this course."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         assignment = get_object_or_404(CourseAssignment, user=user, course=course)
 
         sp, _ = SectionProgress.objects.update_or_create(
             assignment=assignment,
             section=section,
-            defaults={"completed": completed_flag},
+            defaults={"completed": bool(data.get("completed", False))},
         )
 
-        total_sections = Section.objects.filter(course=course).count()
+        all_sections = Section.objects.filter(course=course).count()
         completed_sections = SectionProgress.objects.filter(
             assignment=assignment, completed=True
         ).count()
-        progress = int((completed_sections / total_sections) * 100) if total_sections else 0
+        progress = int((completed_sections / all_sections) * 100) if all_sections else 0
 
         assignment.status = f"{progress}% complete"
         assignment.save(update_fields=["status"])
 
-        return Response(
-            {
-                "course_id": course.id,
-                "section_id": section.id,
-                "completed": sp.completed,
-                "progress": progress,
-                "status": assignment.status,
-                "total_sections": total_sections,
-                "completed_sections": completed_sections,
-            },
-            status=status.HTTP_200_OK,
-        )
+        return Response({
+            "course_id": course.id,
+            "section_id": section.id,
+            "completed": sp.completed,
+            "progress": progress,
+            "status": assignment.status,
+            "total_sections": all_sections,
+            "completed_sections": completed_sections,
+        }, status=status.HTTP_200_OK)
