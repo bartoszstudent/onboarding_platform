@@ -39,8 +39,7 @@ from .serializers import (
 from .models import Badge
 from .permissions import IsCompanyAdmin
 from .models.competencies import Competency
-from backend.core import serializers
-
+from . import serializers
 User = get_user_model()
 
 # ile sekund ważny jest token (tu: 7 dni)
@@ -502,6 +501,71 @@ class CourseViewSet(viewsets.ModelViewSet):
         from .serializers import SectionSerializer
         data = SectionSerializer(sections, many=True).data
         return Response({"course_id": course.id, "sections": data})
+
+class CompanyCourseViewSet(viewsets.ViewSet):
+    """
+    Zarządzanie kursami w kontekście firmy.
+    Ścieżka: /api/companies/{company_pk}/courses/
+    """
+    permission_classes = [permissions.IsAuthenticated, IsCompanyAdmin]
+
+    # GET: Lista kursów firmy
+    def list(self, request, company_pk=None):
+        # Pobieramy workspace'y firmy, a potem kursy
+        workspaces = Workspace.objects.filter(company_id=company_pk)
+        courses = Course.objects.filter(workspace__in=workspaces)
+        serializer = CourseSerializer(courses, many=True)
+        return Response(serializer.data)
+
+    # POST: Dodawanie kursu w firmie
+    def create(self, request, company_pk=None):
+        # Wymagamy podania workspace_id, ale sprawdzamy czy należy do tej firmy
+        workspace_id = request.data.get('workspace')
+        
+        # Security check: czy workspace należy do firmy z URL?
+        if not Workspace.objects.filter(id=workspace_id, company_id=company_pk).exists():
+             return Response({"detail": "Invalid workspace for this company"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = CourseSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # ASSIGN: Przypisywanie użytkowników do kursu
+    @action(detail=False, methods=['post'], url_path='assign')
+    def assign_users(self, request, company_pk=None):
+        """
+        Body: { "course_id": 1, "user_ids": [10, 12, 15] }
+        """
+        serializer = BulkCourseAssignmentSerializer(data=request.data)
+        if serializer.is_valid():
+            course_id = serializer.validated_data['course_id']
+            user_ids = serializer.validated_data['user_ids']
+
+            # Weryfikacja: Czy kurs należy do tej firmy?
+            course = get_object_or_404(Course, pk=course_id)
+            if course.workspace.company.id != int(company_pk):
+                return Response({"detail": "Course does not belong to this company"}, status=status.HTTP_403_FORBIDDEN)
+
+            assignments = []
+            for uid in user_ids:
+                # Weryfikacja: Czy user jest w tej firmie?
+                if UserCompany.objects.filter(company_id=company_pk, user_id=uid).exists():
+                    # Unikamy duplikatów
+                    obj, created = CourseAssignment.objects.get_or_create(
+                        course=course,
+                        user_id=uid,
+                        defaults={
+                            'assigned_by_user': request.user,
+                            'status': 'assigned'
+                        }
+                    )
+                    assignments.append(obj)
+            
+            return Response({"assigned": len(assignments)}, status=status.HTTP_200_OK)
+            
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class CompetencyViewSet(viewsets.ModelViewSet):
     """
