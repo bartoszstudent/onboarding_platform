@@ -49,6 +49,7 @@ class BlockSerializer(serializers.ModelSerializer):
             'quiz_details',
             'text_content',
             'image_url',
+            'image_alt',
             'video_url',
         ]
         read_only_fields = ['id']
@@ -101,6 +102,8 @@ class SectionSerializer(serializers.ModelSerializer):
             'order',
             'blocks',
             'blocks_count',
+            'created_at', 
+            'updated_at',
         ]
         read_only_fields = ['id']
     
@@ -182,6 +185,8 @@ class CourseDetailSerializer(serializers.ModelSerializer):
             'badge_details',
             'sections',
             'total_blocks',
+            'created_at', 
+            'updated_at',
         ]
         read_only_fields = ['id', 'workspace']
     

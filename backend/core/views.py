@@ -257,22 +257,6 @@ def get_company(request, pk):
         )
     serializer = CompanySerializer(company)
     return Response(serializer.data, status=status.HTTP_200_OK)
-class CourseViewSet(viewsets.ModelViewSet):
-    serializer_class = CourseSerializer
-    # Zmieniamy AllowAny na IsAuthenticated, aby mieć dostęp do request.user
-    permission_classes = [permissions.IsAuthenticated] 
-
-    def get_queryset(self):
-        user = self.request.user
-        # Wersja 2: Bardziej jawna (czytelniejsza)
-        try:
-            # Pobieramy firmę użytkownika (zakładając relację OneToOne w UserCompany)
-            user_company = user.user_company 
-            return Course.objects.filter(workspace__company=user_company.company)
-        except (UserCompany.DoesNotExist, AttributeError):
-            # Jeśli użytkownik nie ma przypisanej firmy, nie widzi żadnych kursów
-            return Course.objects.none()
-
 class UserAssignedCoursesViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API endpoint to view courses assigned to a specific user.
