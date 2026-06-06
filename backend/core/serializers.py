@@ -1,22 +1,295 @@
 from rest_framework import serializers
 from .models.training import Course, CourseAssignment
+from .models.section import Section
+from .models.block import Block
 from django.contrib.auth import get_user_model
 from .models.workspaces import Company
-from .models import UserCompany, Company, CourseAssignment
+from .models import UserCompany, Company, CourseAssignment, Quiz
 from .models.competencies import Competency, CompetencyCourse
-from .models import Badge
+from .models import Badge, Question, Answer
+
+# ============================================================================
+# BLOCK SERIALIZERS
+# ============================================================================
+
+class QuizDetailBlockSerializer(serializers.ModelSerializer):
+    """Serializer for Quiz details within a Block"""
+    questions = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Quiz
+        fields = ['id', 'title', 'questions']
+    
+    def get_questions(self, obj):
+        """Get questions with answers for the quiz"""
+        from .serializers import QuestionSerializer
+        questions = obj.questions.all()
+        return QuestionSerializer(questions, many=True).data
+
+
+class BlockSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Block model.
+    Handles all block types: TEXT, IMAGE, VIDEO, QUIZ
+    Dynamically includes content based on block_type
+    """
+    # Include quiz details if this is a quiz block
+    quiz_details = serializers.SerializerMethodField()
+    
+    # Content field that returns the appropriate content based on block_type
+    content = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Block
+        fields = [
+            'id',
+            'order',
+            'block_type',
+            'content',
+            'quiz_details',
+            'text_content',
+            'image_url',
+            'video_url',
+        ]
+        read_only_fields = ['id']
+    
+    def get_content(self, obj):
+        """Return the appropriate content field based on block_type"""
+        if obj.block_type == Block.BlockType.TEXT:
+            return obj.text_content
+        elif obj.block_type == Block.BlockType.IMAGE:
+            return obj.image_url
+        elif obj.block_type == Block.BlockType.VIDEO:
+            return obj.video_url
+        elif obj.block_type == Block.BlockType.QUIZ:
+            return None  # Quiz content is in quiz_details
+        return None
+    
+    def get_quiz_details(self, obj):
+        """Return full quiz details if this is a QUIZ block"""
+        if obj.block_type == Block.BlockType.QUIZ and obj.quiz:
+            return QuizDetailBlockSerializer(obj.quiz).data
+        return None
+    
+    def validate_block_type(self, value):
+        """Validate that block_type is one of the allowed choices"""
+        valid_types = [choice[0] for choice in Block.BlockType.choices]
+        if value not in valid_types:
+            raise serializers.ValidationError(
+                f"Invalid block type. Must be one of: {', '.join(valid_types)}"
+            )
+        return value
+
+
+# ============================================================================
+# SECTION SERIALIZERS
+# ============================================================================
+
+class SectionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Section model with nested blocks.
+    Optimized for frontend structure: Section contains Blocks
+    """
+    blocks = BlockSerializer(many=True, read_only=True)
+    blocks_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Section
+        fields = [
+            'id',
+            'title',
+            'order',
+            'blocks',
+            'blocks_count',
+        ]
+        read_only_fields = ['id']
+    
+    def get_blocks_count(self, obj):
+        """Get total number of blocks in section"""
+        return obj.blocks.count()
+
+
+class SectionCreateUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for creating/updating sections (without nested blocks)"""
+    
+    class Meta:
+        model = Section
+        fields = [
+            'id',
+            'title',
+            'order',
+        ]
+        read_only_fields = ['id']
+
+
+# ============================================================================
+# COURSE SERIALIZERS
+# ============================================================================
+
+class CourseListSerializer(serializers.ModelSerializer):
+    """
+    Simplified course serializer for list endpoints.
+    Returns basic course info with section count.
+    """
+    sections_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id',
+            'workspace',
+            'title',
+            'description',
+            'thumbnail',
+            'duration',
+            'completion_badge',
+            'sections_count',
+        ]
+        read_only_fields = ['id']
+    
+    def get_sections_count(self, obj):
+        """Get total number of sections in course"""
+        return obj.sections.count()
+
+
+class CourseDetailSerializer(serializers.ModelSerializer):
+    """
+    Complete course serializer with full nested structure.
+    Course → Sections → Blocks (with all block details)
+    
+    Includes:
+    - All course metadata
+    - All sections in order
+    - All blocks for each section in order
+    - Quiz details for quiz blocks
+    
+    Frontend can render the full course structure from this single endpoint.
+    """
+    sections = SectionSerializer(many=True, read_only=True)
+    badge_details = serializers.SerializerMethodField()
+    total_blocks = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id',
+            'workspace',
+            'title',
+            'description',
+            'thumbnail',
+            'duration',
+            'completion_badge',
+            'badge_details',
+            'sections',
+            'total_blocks',
+        ]
+        read_only_fields = ['id', 'workspace']
+    
+    def get_badge_details(self, obj):
+        """Return badge details if completion_badge is set"""
+        if obj.completion_badge:
+            return BadgeSerializer(obj.completion_badge).data
+        return None
+    
+    def get_total_blocks(self, obj):
+        """Calculate total number of blocks across all sections"""
+        return sum(section.blocks.count() for section in obj.sections.all())
+
+
+class CourseSerializer(serializers.ModelSerializer):
+    """
+    Standard course serializer for basic CRUD operations.
+    Use CourseDetailSerializer for full nested data.
+    """
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id',
+            'workspace',
+            'title',
+            'description',
+            'thumbnail',
+            'duration',
+            'completion_badge',
+        ]
+        read_only_fields = ['id']
+
+
+class CourseCreateUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for creating and updating courses"""
+    
+    class Meta:
+        model = Course
+        fields = [
+            'workspace',
+            'title',
+            'description',
+            'thumbnail',
+            'duration',
+            'completion_badge',
+        ]
+    
+    def validate_title(self, value):
+        """Validate that title is not empty"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Course title cannot be empty.")
+        return value.strip()
+
+
+# ============================================================================
+# QUIZ/QUESTION/ANSWER SERIALIZERS
+# ============================================================================
+
+class AnswerSerializer(serializers.ModelSerializer):
+    """Serializer for Answer model"""
+    
+    class Meta:
+        model = Answer
+        fields = ['id', 'answer_text']
+        # IMPORTANT: Don't send is_correct to the user!
+        read_only_fields = ['id']
+
+
+class QuestionSerializer(serializers.ModelSerializer):
+    """Serializer for Question model with nested answers"""
+    answers = AnswerSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Question
+        fields = ['id', 'question_text', 'question_type', 'image_url', 'answers']
+        read_only_fields = ['id']
+
+
+class QuizDetailSerializer(serializers.ModelSerializer):
+    """Serializer for Quiz with full question details"""
+    questions = QuestionSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Quiz
+        fields = ['id', 'title', 'questions']
+        read_only_fields = ['id']
+
+
+# ============================================================================
+# BADGE SERIALIZER
+# ============================================================================
 
 class BadgeSerializer(serializers.ModelSerializer):
-    """
-    Serializer for the Badge model.
-    """
+    """Serializer for Badge model"""
+    
     class Meta:
         model = Badge
-        fields = ['id', 'course', 'name', 'description', 'image']
+        fields = ['id', 'name', 'description', 'image']
+        read_only_fields = ['id']
 
+
+# ============================================================================
+# COMPANY SERIALIZERS
+# ============================================================================
 
 class CompanySerializer(serializers.ModelSerializer):
-    """Serializer do tworzenia i pobierania firm"""
+    """Serializer for Company/Workspace model"""
 
     class Meta:
         model = Company
@@ -32,28 +305,19 @@ class CompanySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at"]
 
-User = get_user_model()
 
-class CourseSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Course
-        fields = [
-            'id',
-            'workspace',
-            'title',
-            'description',
-            'thumbnail',
-            'duration',
-            'completion_badge',
-        ]
+# ============================================================================
+# COURSE ASSIGNMENT SERIALIZERS
+# ============================================================================
 
 class CourseAssignmentSerializer(serializers.ModelSerializer):
+    """Serializer for CourseAssignment model"""
     badge_id = serializers.IntegerField(write_only=True, required=False)
 
     class Meta:
         model = CourseAssignment
         fields = ['id', 'course', 'user', 'assigned_by_user', 'status', 'badge_id']
-        read_only_fields = ['assigned_by_user'] # Set automatically
+        read_only_fields = ['assigned_by_user']
 
     def update(self, instance, validated_data):
         validated_data.pop('badge_id', None)
@@ -62,40 +326,23 @@ class CourseAssignmentSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop('badge_id', None)
         return super().create(validated_data)
-from .models import Quiz, Question, Answer
 
-class AnswerSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Answer
-        fields = ['id', 'answer_text'] # IMPORTANT: Don't send is_correct to the user!
 
-class QuestionSerializer(serializers.ModelSerializer):
-    answers = AnswerSerializer(many=True, read_only=True) # Nested serializer
+class BulkCourseAssignmentSerializer(serializers.Serializer):
+    """Serializer for bulk assigning users to a course"""
+    course_id = serializers.IntegerField()
+    user_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        allow_empty=False
+    )
 
-    class Meta:
-        model = Question
-        fields = ['id', 'question_text', 'question_type', 'image_url', 'answers']
 
-class QuizDetailSerializer(serializers.ModelSerializer):
-    questions = QuestionSerializer(many=True, read_only=True) # Nested serializer
-
-    class Meta:
-        model = Quiz
-        fields = ['id', 'title', 'questions']
-        
-class CompanyUserAddSerializer(serializers.ModelSerializer):
-    """Służy do dodawania istniejącego lub nowego użytkownika do firmy"""
-    email = serializers.EmailField()
-    first_name = serializers.CharField(required=False)
-    last_name = serializers.CharField(required=False)
-    role = serializers.ChoiceField(choices=[('employee', 'Employee'), ('admin', 'Admin')], default='employee')
-
-    class Meta:
-        model = UserCompany
-        fields = ['email', 'first_name', 'last_name', 'role']
+# ============================================================================
+# USER COMPANY SERIALIZERS
+# ============================================================================
 
 class UserCompanyListSerializer(serializers.ModelSerializer):
-    """Do wyświetlania listy pracowników"""
+    """Serializer for listing company users"""
     email = serializers.EmailField(source='user.email')
     first_name = serializers.CharField(source='user.first_name')
     last_name = serializers.CharField(source='user.last_name')
@@ -107,104 +354,113 @@ class UserCompanyListSerializer(serializers.ModelSerializer):
         fields = ['id', 'user_id', 'email', 'first_name', 'last_name', 'role', 'courses_count']
 
     def get_courses_count(self, obj):
-        # Liczymy przypisania kursów dla użytkownika (CourseAssignment)
+        """Get count of assigned courses for user"""
         try:
             return CourseAssignment.objects.filter(user=obj.user).count()
         except Exception:
             return 0
 
-# --- Serializery do Przypisywania Kursów ---
 
-class BulkCourseAssignmentSerializer(serializers.Serializer):
-    """Pozwala przypisać wielu użytkowników do jednego kursu na raz"""
-    course_id = serializers.IntegerField()
-    user_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        allow_empty=False
+class CompanyUserAddSerializer(serializers.ModelSerializer):
+    """Serializer for adding users to company"""
+    email = serializers.EmailField()
+    first_name = serializers.CharField(required=False)
+    last_name = serializers.CharField(required=False)
+    role = serializers.ChoiceField(
+        choices=[('employee', 'Employee'), ('admin', 'Admin')],
+        default='employee'
     )
 
-# --- Serializery do Kompetencji ---
+    class Meta:
+        model = UserCompany
+        fields = ['email', 'first_name', 'last_name', 'role']
+
+
+# ============================================================================
+# COMPETENCY SERIALIZERS
+# ============================================================================
 
 class CompetencySerializer(serializers.ModelSerializer):
-    """Serializer for listing and creating competencies"""
+    """Serializer for creating/updating competencies"""
     courses = serializers.PrimaryKeyRelatedField(
-        many=True, 
+        many=True,
         queryset=Course.objects.all(),
         required=False,
         write_only=True
     )
-    
+
     class Meta:
         model = Competency
         fields = ['id', 'workspace', 'name', 'description', 'courses']
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
-        # Filtruj kursy na podstawie workspace
+
+        # Filter courses based on workspace
         request = self.context.get('request')
         if request and request.method in ['POST', 'PUT', 'PATCH']:
-            # Podczas tworzenia/edycji - filtruj na podstawie workspace z requesta
+            # During create/update - filter by workspace from request
             workspace_id = request.data.get('workspace')
             if workspace_id:
                 self.fields['courses'].queryset = Course.objects.filter(workspace_id=workspace_id)
         elif self.instance:
-            # Podczas edycji istniejącej kompetencji
+            # During update of existing competency
             self.fields['courses'].queryset = Course.objects.filter(workspace=self.instance.workspace)
-    
+
     def validate(self, data):
-        """Sprawdź czy wybrane kursy należą do tego samego workspace co kompetencja"""
+        """Validate that selected courses belong to the same workspace"""
         workspace = data.get('workspace')
         courses = data.get('courses', [])
-        
+
         if workspace and courses:
             for course in courses:
                 if course.workspace != workspace:
                     raise serializers.ValidationError({
                         'courses': f'Kurs "{course.title}" nie należy do wybranego workspace.'
                     })
-        
+
         return data
-    
+
     def create(self, validated_data):
         courses_data = validated_data.pop('courses', [])
         competency = Competency.objects.create(**validated_data)
-        
-        # Przypisz kursy do kompetencji
+
+        # Assign courses to competency
         for course in courses_data:
             CompetencyCourse.objects.create(competency=competency, course=course)
-        
+
         return competency
-    
+
     def update(self, instance, validated_data):
         courses_data = validated_data.pop('courses', None)
-        
-        # Aktualizuj podstawowe pola
+
+        # Update basic fields
         instance.name = validated_data.get('name', instance.name)
         instance.description = validated_data.get('description', instance.description)
         instance.workspace = validated_data.get('workspace', instance.workspace)
         instance.save()
-        
-        # Jeśli przesłano kursy, zaktualizuj relacje
+
+        # Update course relationships if provided
         if courses_data is not None:
-            # Usuń istniejące relacje
             CompetencyCourse.objects.filter(competency=instance).delete()
-            # Dodaj nowe
             for course in courses_data:
                 CompetencyCourse.objects.create(competency=instance, course=course)
-        
+
         return instance
 
 
 class CompetencyDetailSerializer(serializers.ModelSerializer):
     """Detailed serializer with full course information"""
     courses = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Competency
         fields = ['id', 'workspace', 'name', 'description', 'courses']
-    
+
     def get_courses(self, obj):
-        competency_courses = CompetencyCourse.objects.filter(competency=obj).select_related('course')
+        """Get full course details for courses in this competency"""
+        competency_courses = CompetencyCourse.objects.filter(
+            competency=obj
+        ).select_related('course')
         courses = [cc.course for cc in competency_courses]
-        return CourseSerializer(courses, many=True).data
+        return CourseListSerializer(courses, many=True).data
