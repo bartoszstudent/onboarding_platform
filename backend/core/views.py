@@ -22,7 +22,10 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from .models.progress import SectionProgress
 from .models.section import Section
-from .serializers import ( 
+from .serializers import (  
+    CourseDetailSerializer, 
+    CourseListSerializer,
+    CourseCreateUpdateSerializer,
     CourseSerializer, 
     CompanyUserAddSerializer, 
     UserCompanyListSerializer,
@@ -36,6 +39,7 @@ from .serializers import (
 from .models import Badge
 from .permissions import IsCompanyAdmin
 from .models.competencies import Competency
+from backend.core import serializers
 
 User = get_user_model()
 
@@ -448,71 +452,72 @@ class CompanyUsersViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_200_OK)
 
 
-class CompanyCourseViewSet(viewsets.ViewSet):
+class CourseViewSet(viewsets.ModelViewSet):
     """
-    Zarządzanie kursami w kontekście firmy.
-    Ścieżka: /api/companies/{company_pk}/courses/
+    API endpoint for Course management with full structure.
+    
+    GET /api/courses/                  → Lista kursów (basic info)
+    GET /api/courses/{id}/             → Szczegóły kursu (FULL NESTED STRUCTURE)
+    POST /api/courses/                 → Tworzenie kursu
+    PUT/PATCH /api/courses/{id}/       → Edycja kursu
     """
-    permission_classes = [permissions.IsAuthenticated, IsCompanyAdmin]
+    permission_classes = [permissions.IsAuthenticated]
 
-    # GET: Lista kursów firmy
-    def list(self, request, company_pk=None):
-        # Pobieramy workspace'y firmy, a potem kursy
-        workspaces = Workspace.objects.filter(company_id=company_pk)
-        courses = Course.objects.filter(workspace__in=workspaces)
-        serializer = CourseSerializer(courses, many=True)
-        return Response(serializer.data)
+    def get_queryset(self):
+        """
+        Pobierz kursy użytkownika z optymalizacją.
+        prefetch_related() redukuje liczbę SQL queries.
+        """
+        user = self.request.user
+        try:
+            user_company = UserCompany.objects.get(user=user)
+            queryset = Course.objects.filter(
+                workspace__company=user_company.company
+            ).prefetch_related(
+                'sections', 
+                'sections__blocks',
+                'sections__blocks__quiz',
+            )
+            return queryset
+        except UserCompany.DoesNotExist:
+            return Course.objects.none()
 
-    # POST: Dodawanie kursu w firmie
-    def create(self, request, company_pk=None):
-        # Wymagamy podania workspace_id, ale sprawdzamy czy należy do tej firmy
-        workspace_id = request.data.get('workspace')
+    def get_serializer_class(self):
+        """Użyj odpowiedniego serializera w zależności od akcji"""
+        if self.action == 'retrieve':
+            return CourseDetailSerializer
+        elif self.action == 'list':
+            return CourseListSerializer
+        elif self.action in ['create']:
+            return CourseCreateUpdateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return CourseCreateUpdateSerializer
+        return CourseSerializer
+
+    def perform_create(self, serializer):
+        """Automatycznie ustaw workspace na workspace użytkownika"""
+        try:
+            user_company = UserCompany.objects.get(user=self.request.user)
+            workspace = user_company.company.workspaces.first()
+            serializer.save(workspace=workspace)
+        except Exception as e:
+            raise serializers.ValidationError(
+                {"workspace": "Nie można określić workspace użytkownika."}
+            )
+
+    @action(detail=True, methods=['get'])
+    def structure(self, request, pk=None):
+        """
+        Dodatkowy endpoint do pobierania SAMEJ struktury kursu
+        (sekcje + bloki) bez metadanych kursu.
         
-        # Security check: czy workspace należy do firmy z URL?
-        if not Workspace.objects.filter(id=workspace_id, company_id=company_pk).exists():
-             return Response({"detail": "Invalid workspace for this company"}, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer = CourseSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    # ASSIGN: Przypisywanie użytkowników do kursu
-    @action(detail=False, methods=['post'], url_path='assign')
-    def assign_users(self, request, company_pk=None):
+        GET /api/courses/{id}/structure/ → { sections: [...] }
         """
-        Body: { "course_id": 1, "user_ids": [10, 12, 15] }
-        """
-        serializer = BulkCourseAssignmentSerializer(data=request.data)
-        if serializer.is_valid():
-            course_id = serializer.validated_data['course_id']
-            user_ids = serializer.validated_data['user_ids']
-
-            # Weryfikacja: Czy kurs należy do tej firmy?
-            course = get_object_or_404(Course, pk=course_id)
-            if course.workspace.company.id != int(company_pk):
-                return Response({"detail": "Course does not belong to this company"}, status=status.HTTP_403_FORBIDDEN)
-
-            assignments = []
-            for uid in user_ids:
-                # Weryfikacja: Czy user jest w tej firmie?
-                if UserCompany.objects.filter(company_id=company_pk, user_id=uid).exists():
-                    # Unikamy duplikatów
-                    obj, created = CourseAssignment.objects.get_or_create(
-                        course=course,
-                        user_id=uid,
-                        defaults={
-                            'assigned_by_user': request.user,
-                            'status': 'assigned'
-                        }
-                    )
-                    assignments.append(obj)
-            
-            return Response({"assigned": len(assignments)}, status=status.HTTP_200_OK)
-            
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        course = self.get_object()
+        sections = course.sections.all().prefetch_related('blocks')
+        from .serializers import SectionSerializer
+        data = SectionSerializer(sections, many=True).data
+        return Response({"course_id": course.id, "sections": data})
 
 class CompetencyViewSet(viewsets.ModelViewSet):
     """
