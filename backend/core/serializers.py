@@ -2,7 +2,9 @@ from rest_framework import serializers
 from .models.training import Course, CourseAssignment
 from django.contrib.auth import get_user_model
 from .models.workspaces import Company
-from .models import UserCompany, Company, CourseAssignment
+from .models import UserCompany, Company, CourseAssignment, OnboardingTemplate, \
+    OnboardingTaskTemplate, Onboarding, \
+    OnboardingTaskInstance
 from .models.competencies import Competency, CompetencyCourse
 from .models import Badge
 
@@ -208,3 +210,103 @@ class CompetencyDetailSerializer(serializers.ModelSerializer):
         competency_courses = CompetencyCourse.objects.filter(competency=obj).select_related('course')
         courses = [cc.course for cc in competency_courses]
         return CourseSerializer(courses, many=True).data
+
+
+# ==========================================
+# 1. SZABLONY ONBOARDINGU (Templates)
+# ==========================================
+
+class OnboardingTaskTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OnboardingTaskTemplate
+        fields = ['id', 'template', 'title', 'sequence']
+
+
+class OnboardingTemplateSerializer(serializers.ModelSerializer):
+    # Wyświetlamy zadania szablonu jako zagnieżdżoną listę (tylko do odczytu w tym miejscu)
+    tasks = OnboardingTaskTemplateSerializer(many=True, read_only=True, source='onboardingtasktemplate_set')
+
+    class Meta:
+        model = OnboardingTemplate
+        fields = ['id', 'workspace', 'name', 'created_by_user', 'tasks']
+        read_only_fields = ['created_by_user']
+
+    def create(self, validated_data):
+        # Automatycznie przypisujemy zalogowanego użytkownika jako twórcę
+        request = self.context.get('request')
+        if request and request.user:
+            validated_data['created_by_user'] = request.user
+        return super().create(validated_data)
+
+
+# ==========================================
+# 2. INSTANCJE ONBOARDINGU (User Instances)
+# ==========================================
+
+class OnboardingTaskInstanceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OnboardingTaskInstance
+        fields = ['id', 'onboarding', 'template_task', 'assigned_to_user', 'assigned_by_user', 'mentor_user', 'status']
+        read_only_fields = ['assigned_by_user']
+
+    def validate(self, data):
+        """
+        Walidacja spójności: Sprawdza, czy szablon zadania (template_task)
+        należy do tego samego szablonu głównego, na którym bazuje instancja onboardingu.
+        """
+        onboarding = data.get('onboarding') or (self.instance.onboarding if self.instance else None)
+        template_task = data.get('template_task') or (self.instance.template_task if self.instance else None)
+
+        if onboarding and template_task:
+            if template_task.template != onboarding.template:
+                raise serializers.ValidationError({
+                    "template_task": "Wybrane zadanie nie należy do szablonu przypisanego do tego procesu onboardingu."
+                })
+        return data
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user:
+            validated_data['assigned_by_user'] = request.user
+        return super().create(validated_data)
+
+
+class OnboardingSerializer(serializers.ModelSerializer):
+    # Podgląd powiązanych zadań-instancji wewnątrz widoku szczegółowego onboardingu
+    task_instances = OnboardingTaskInstanceSerializer(many=True, read_only=True, source='onboardingtaskinstance_set')
+
+    class Meta:
+        model = Onboarding
+        fields = ['id', 'template', 'user', 'mentor', 'status', 'task_instances']
+
+    def create(self, validated_data):
+        """
+        Automatyzacja cyklu życia: Podczas tworzenia nowego onboardingu dla użytkownika,
+        system automatycznie generuje dla niego instancje zadań na podstawie szablonu.
+        """
+        template = validated_data['template']
+        onboarding = Onboarding.objects.create(**validated_data)
+
+        # Pobierz wszystkie definicje zadań z szablonu
+        task_templates = OnboardingTaskTemplate.objects.filter(template=template)
+
+        # Generuj instancje zadań dla użytkownika
+        request = self.context.get('request')
+        assigned_by = request.user if request and request.user.is_authenticated else None
+
+        task_instances = [
+            OnboardingTaskInstance(
+                onboarding=onboarding,
+                template_task=task_template,
+                assigned_to_user=onboarding.user,
+                assigned_by_user=assigned_by,
+                mentor_user=onboarding.mentor,
+                status="pending"  # Domyślny status początkowy
+            )
+            for task_template in task_templates
+        ]
+
+        # Masowe dodawanie do bazy (wydajność SQL Optimization)
+        OnboardingTaskInstance.objects.bulk_create(task_instances)
+
+        return onboarding
