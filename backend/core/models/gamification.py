@@ -1,3 +1,4 @@
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.conf import settings
 from .workspaces import Workspace
@@ -32,8 +33,33 @@ class UserBadge(models.Model):
 
 
 class MentorRating(models.Model):
-    mentor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    onboarding_task_instance = models.ForeignKey(
-        OnboardingTaskInstance, on_delete=models.CASCADE
-    )
-    rating = models.PositiveIntegerField()
+        mentor = models.ForeignKey(
+            settings.AUTH_USER_MODEL,
+            on_delete=models.CASCADE,
+            related_name="mentor_ratings"
+        )
+        # Zakładam, że task instance ma powiązanie z użytkownikiem (studentem), który ocenia
+        onboarding_task_instance = models.ForeignKey(
+            OnboardingTaskInstance,
+            on_delete=models.CASCADE,
+            related_name="mentor_ratings"
+        )
+        # Zmiana na Decimal dla ocen typu 4.5
+        rating = models.DecimalField(
+            max_digits=2,
+            decimal_places=1,
+            validators=[MinValueValidator(1.0), MaxValueValidator(5.0)]
+        )
+        created_at = models.DateTimeField(auto_now_add=True)
+
+        class Meta:
+            # Zapewnia, że jedno zadanie może być ocenione tylko raz
+            constraints = [
+                models.UniqueConstraint(
+                    fields=['onboarding_task_instance'],
+                    name='uniq_onboarding_task_rating'
+                )
+            ]
+
+        def __str__(self):
+            return f"Rating {self.rating} for Mentor {self.mentor_id}"

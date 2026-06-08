@@ -1,7 +1,9 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet, UserAssignedCoursesViewSet, CourseAssignmentViewSet, create_company, list_companies, get_company, CompanyManagementViewSet, CompanyUsersViewSet, CompanyCourseViewSet, CompetencyViewSet, get_quiz_for_course
+from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet, UserAssignedCoursesViewSet, \
+    CourseAssignmentViewSet, create_company, list_companies, get_company, CompanyManagementViewSet, CompanyUsersViewSet, \
+    CompanyCourseViewSet, CompetencyViewSet, get_quiz_for_course, MentorRatingViewSet
 from core.views import BadgeViewSet
 from core.views import SectionProgressView
 
@@ -12,6 +14,7 @@ router.register(r'course-assignments', CourseAssignmentViewSet)
 router.register(r'companies', CompanyManagementViewSet, basename='company')
 router.register(r'competencies', CompetencyViewSet, basename='competency')
 router.register(r'badges', BadgeViewSet)
+router.register(r'ratings', MentorRatingViewSet, basename='mentor-rating')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

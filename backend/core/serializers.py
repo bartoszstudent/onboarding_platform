@@ -1,10 +1,12 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 from .models.training import Course, CourseAssignment
 from .models.section import Section
 from .models.block import Block
 from django.contrib.auth import get_user_model
 from .models.workspaces import Company
-from .models import UserCompany, Company, CourseAssignment, Quiz
+from .models import UserCompany, Company, CourseAssignment, Quiz, MentorRating
 from .models.competencies import Competency, CompetencyCourse
 from .models import Badge, Question, Answer
 
@@ -469,3 +471,21 @@ class CompetencyDetailSerializer(serializers.ModelSerializer):
         ).select_related('course')
         courses = [cc.course for cc in competency_courses]
         return CourseListSerializer(courses, many=True).data
+
+class MentorRatingSerializer(serializers.ModelSerializer):
+    # Wyciągamy ID użytkownika automatycznie z requestu w ViewSetie
+    class Meta:
+        model = MentorRating
+        fields = ['id', 'mentor', 'onboarding_task_instance', 'rating', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def validate_rating(self, value):
+        # Sprawdzenie czy ocena kończy się na .0 lub .5
+        if value % Decimal('0.5') != 0:
+            raise serializers.ValidationError("Ocena musi być wielokrotnością 0.5 (np. 4.0, 4.5, 5.0).")
+        return value
+
+
+class MentorStatsSerializer(serializers.Serializer):
+    average_rating = serializers.FloatField()
+    total_ratings = serializers.IntegerField()
