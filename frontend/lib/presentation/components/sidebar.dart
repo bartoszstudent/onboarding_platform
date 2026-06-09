@@ -42,6 +42,10 @@ class _SidebarState extends State<Sidebar> {
           path: '/settings',
           asset: 'assets/icons/settings.svg',
           label: 'Ustawienia'));
+      base.add(const _MenuItem(
+          path: '/onboarding',
+          asset: 'assets/icons/book-open.svg',
+          label: 'Zadania onboardingowe'));
     }
 
     return base;
