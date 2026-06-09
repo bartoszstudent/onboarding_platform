@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import '../../ui/stat_card.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../data/services/dashboard_service.dart';
 import '../../../data/models/dashboard_models.dart';
+import '../../../data/services/auth_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -16,19 +18,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late Future<DashboardStats> _statsFuture;
   late Future<List<ActivityItem>> _activitiesFuture;
 
+  String? _role;
+  String? _userName;
+  bool _loadingUser = true;
+
   @override
   void initState() {
     super.initState();
     _statsFuture = DashboardService.getStats();
     _activitiesFuture = DashboardService.getRecentActivities(limit: 10);
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    try {
+      final user = await AuthService.getCurrentUser();
+      final role = await AuthService.getRole();
+      if (mounted) {
+        setState(() {
+          _role = role;
+          _userName = user?.name;
+          _loadingUser = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingUser = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loadingUser) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final isAdmin = _role == 'admin' || _role == 'super_admin' || _role == 'hr';
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Welcome banner (static)
+        // Welcome banner
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
@@ -41,17 +76,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Witaj, admin! 👋',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(color: Colors.white)),
+              Text(
+                isAdmin
+                    ? 'Witaj, ${_userName ?? 'admin'}! 👋'
+                    : 'Witaj, ${_userName ?? 'pracowniku'}! 👋',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(color: Colors.white),
+              ),
               const SizedBox(height: 8),
-              Text('Panel zarządzania firmą - przegląd aktywności i statystyk',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Colors.white70)),
+              Text(
+                isAdmin
+                    ? 'Panel zarządzania firmą - przegląd aktywności i statystyk'
+                    : 'Twój panel wdrożeniowy - monitoruj swój postęp i zadania',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: Colors.white70),
+              ),
               const SizedBox(height: 12),
               Container(
                 padding:
@@ -69,239 +112,252 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         const SizedBox(height: 20),
 
-        // Stats + activities fetched from service
-        FutureBuilder<DashboardStats>(
-          future: _statsFuture,
-          builder: (context, snap) {
-            if (snap.connectionState != ConnectionState.done) {
-              return const SizedBox(
-                  height: 120,
-                  child: Center(child: CircularProgressIndicator()));
-            }
-            if (snap.hasError) {
-              return Container(
-                padding: const EdgeInsets.all(16),
-                child: Text('Błąd ładowania statystyk: ${snap.error}'),
-              );
-            }
-            final stats = snap.data!;
-
-            return LayoutBuilder(builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              final cardWidth = width >= 1100 ? (width - 32) / 3 : 320.0;
-              return Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  SizedBox(
-                      width: cardWidth,
-                      child: StatCard(
-                          iconAsset: 'assets/icons/book-open.svg',
-                          title: 'Liczba kursów',
-                          value: stats.courses.toString(),
-                          delta: '+3 w tym miesiącu')),
-                  SizedBox(
-                      width: cardWidth,
-                      child: StatCard(
-                          iconAsset: 'assets/icons/users.svg',
-                          title: 'Liczba pracowników',
-                          value: stats.employees.toString(),
-                          delta: '+12 w tym miesiącu')),
-                  SizedBox(
-                      width: cardWidth,
-                      child: StatCard(
-                          iconAsset: 'assets/icons/clock.svg',
-                          title: 'Średni czas ukończenia',
-                          value: '${stats.avgCompletionHours}h',
-                          delta: '-0.5h vs poprzedni')),
-                ],
-              );
-            });
-          },
-        ),
-
-        const SizedBox(height: 20),
-
-        // Chart + quick actions (chart stays placeholder)
-        LayoutBuilder(builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final leftWidth = width >= 1000 ? width * 0.68 : width;
-          final rightWidth = width >= 1000 ? width * 0.3 : width;
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: leftWidth,
-                child: Container(
-                  decoration: BoxDecoration(
-                      color: Tokens.surface,
-                      borderRadius: BorderRadius.circular(Tokens.radius2xl),
-                      boxShadow: Tokens.shadowSm),
+        if (isAdmin) ...[
+          // Stats + activities fetched from service
+          FutureBuilder<DashboardStats>(
+            future: _statsFuture,
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done) {
+                return const SizedBox(
+                    height: 120,
+                    child: Center(child: CircularProgressIndicator()));
+              }
+              if (snap.hasError) {
+                return Container(
                   padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          SvgPicture.asset('assets/icons/chart-bar.svg',
-                              width: 18, height: 18, color: Tokens.blue),
-                          const SizedBox(width: 8),
-                          const Text('Postęp pracowników w tym tygodniu',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w600, fontSize: 14)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        height: 200,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: List.generate(7, (i) {
-                            final heights = [
-                              0.45,
-                              0.55,
-                              0.6,
-                              0.58,
-                              0.72,
-                              0.4,
-                              0.35
-                            ];
-                            return Expanded(
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 6),
-                                child: Container(
-                                  height: 200 * heights[i],
-                                  decoration: BoxDecoration(
-                                    color: Tokens.blue,
-                                    borderRadius: BorderRadius.circular(6),
+                  child: Text('Błąd ładowania statystyk: ${snap.error}'),
+                );
+              }
+              final stats = snap.data!;
+
+              return LayoutBuilder(builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final cardWidth = width >= 1100 ? (width - 32) / 3 : 320.0;
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    SizedBox(
+                        width: cardWidth,
+                        child: StatCard(
+                            iconAsset: 'assets/icons/book-open.svg',
+                            title: 'Liczba kursów',
+                            value: stats.courses.toString(),
+                            delta: '+3 w tym miesiącu')),
+                    SizedBox(
+                        width: cardWidth,
+                        child: StatCard(
+                            iconAsset: 'assets/icons/users.svg',
+                            title: 'Liczba pracowników',
+                            value: stats.employees.toString(),
+                            delta: '+12 w tym miesiącu')),
+                    SizedBox(
+                        width: cardWidth,
+                        child: StatCard(
+                            iconAsset: 'assets/icons/clock.svg',
+                            title: 'Średni czas ukończenia',
+                            value: '${stats.avgCompletionHours}h',
+                            delta: '-0.5h vs poprzedni')),
+                  ],
+                );
+              });
+            },
+          ),
+
+          const SizedBox(height: 20),
+
+          // Chart + quick actions
+          LayoutBuilder(builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final leftWidth = width >= 1000 ? width * 0.68 : width;
+            final rightWidth = width >= 1000 ? width * 0.3 : width;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: leftWidth,
+                  child: Container(
+                    decoration: BoxDecoration(
+                        color: Tokens.surface,
+                        borderRadius: BorderRadius.circular(Tokens.radius2xl),
+                        boxShadow: Tokens.shadowSm),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            SvgPicture.asset('assets/icons/chart-bar.svg',
+                                width: 18, height: 18, color: Tokens.blue),
+                            const SizedBox(width: 8),
+                            const Text('Postęp pracowników w tym tygodniu',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 14)),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 200,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: List.generate(7, (i) {
+                              final heights = [
+                                0.45,
+                                0.55,
+                                0.6,
+                                0.58,
+                                0.72,
+                                0.4,
+                                0.35
+                              ];
+                              return Expanded(
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 6),
+                                  child: Container(
+                                    height: 200 * heights[i],
+                                    decoration: BoxDecoration(
+                                      color: Tokens.blue,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          }),
-                        ),
-                      )
-                    ],
+                              );
+                            }),
+                          ),
+                        )
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              if (width >= 1000) const SizedBox(width: 20),
-              SizedBox(
-                width: rightWidth,
-                child: Container(
-                  decoration: BoxDecoration(
-                      color: Tokens.surface,
-                      borderRadius: BorderRadius.circular(Tokens.radius2xl),
-                      boxShadow: Tokens.shadowSm),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Szybkie akcje',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 14)),
-                      const SizedBox(height: 12),
-                      Column(
-                        children: [
-                          _quickAction(context, 'Dodaj nowy kurs'),
-                          const SizedBox(height: 8),
-                          _quickAction(context, 'Zaproś pracownika'),
-                          const SizedBox(height: 8),
-                          _quickAction(context, 'Generuj raport'),
-                        ],
-                      )
-                    ],
+                if (width >= 1000) const SizedBox(width: 20),
+                SizedBox(
+                  width: rightWidth,
+                  child: Container(
+                    decoration: BoxDecoration(
+                        color: Tokens.surface,
+                        borderRadius: BorderRadius.circular(Tokens.radius2xl),
+                        boxShadow: Tokens.shadowSm),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Szybkie akcje',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14)),
+                        const SizedBox(height: 12),
+                        Column(
+                          children: [
+                            _quickAction(context, 'Dodaj nowy kurs'),
+                            const SizedBox(height: 8),
+                            _quickAction(context, 'Zaproś pracownika'),
+                            const SizedBox(height: 8),
+                            _quickAction(context, 'Generuj raport'),
+                          ],
+                        )
+                      ],
+                    ),
                   ),
-                ),
-              )
-            ],
-          );
-        }),
-
-        const SizedBox(height: 20),
-
-        // Recent activities table (from service)
-        FutureBuilder<List<ActivityItem>>(
-          future: _activitiesFuture,
-          builder: (context, snap) {
-            if (snap.connectionState != ConnectionState.done) {
-              return const SizedBox(
-                  height: 120,
-                  child: Center(child: CircularProgressIndicator()));
-            }
-            if (snap.hasError) {
-              return Container(
-                padding: const EdgeInsets.all(16),
-                child: Text('Błąd ładowania aktywności: ${snap.error}'),
-              );
-            }
-            final activities = snap.data ?? [];
-
-            return Container(
-              decoration: BoxDecoration(
-                  color: Tokens.surface,
-                  borderRadius: BorderRadius.circular(Tokens.radius2xl),
-                  boxShadow: Tokens.shadowSm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text('Ostatnie aktywności',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600)),
-                  ),
-                  const Divider(height: 1),
-                  ...activities.map((r) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      decoration: const BoxDecoration(
-                          border: Border(
-                              bottom: BorderSide(color: Tokens.gray200))),
-                      child: Row(
-                        children: [
-                          Expanded(flex: 2, child: Text(r.user)),
-                          Expanded(flex: 2, child: Text(r.action)),
-                          Expanded(child: Text(r.course)),
-                          Expanded(child: Text(r.time)),
-                        ],
-                      ),
-                    );
-                  }).toList()
-                ],
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 20),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final isWide = width > 900;
-
-            return isWide
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Expanded(child: UserStatsWidget()),
-                    SizedBox(width: 20),
-                    Expanded(child: BadgeWidget()),
-                  ],
                 )
-              : Column(
-                children: const [
-                  UserStatsWidget(),
-                  SizedBox(height: 20),
-                  BadgeWidget(),
-                ],
+              ],
+            );
+          }),
+
+          const SizedBox(height: 20),
+
+          // Recent activities table
+          FutureBuilder<List<ActivityItem>>(
+            future: _activitiesFuture,
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done) {
+                return const SizedBox(
+                    height: 120,
+                    child: Center(child: CircularProgressIndicator()));
+              }
+              if (snap.hasError) {
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('Błąd ładowania aktywności: ${snap.error}'),
+                );
+              }
+              final activities = snap.data ?? [];
+
+              return Container(
+                decoration: BoxDecoration(
+                    color: Tokens.surface,
+                    borderRadius: BorderRadius.circular(Tokens.radius2xl),
+                    boxShadow: Tokens.shadowSm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text('Ostatnie aktywności',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                    ),
+                    const Divider(height: 1),
+                    ...activities.map((r) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        decoration: const BoxDecoration(
+                            border: Border(
+                                bottom: BorderSide(color: Tokens.gray200))),
+                        child: Row(
+                          children: [
+                            Expanded(flex: 2, child: Text(r.user)),
+                            Expanded(flex: 2, child: Text(r.action)),
+                            Expanded(child: Text(r.course)),
+                            Expanded(child: Text(r.time)),
+                          ],
+                        ),
+                      );
+                    }).toList()
+                  ],
+                ),
               );
             },
           ),
+        ] else ...[
+          // Employee dashboard views
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final isWide = width > 900;
+
+              return isWide
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            children: const [
+                              UserStatsWidget(),
+                              SizedBox(height: 20),
+                              MentorCardWidget(),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        const Expanded(child: BadgeWidget()),
+                      ],
+                    )
+                  : Column(
+                      children: const [
+                        UserStatsWidget(),
+                        SizedBox(height: 20),
+                        MentorCardWidget(),
+                        SizedBox(height: 20),
+                        BadgeWidget(),
+                      ],
+                    );
+            },
+          ),
+        ],
       ],
     );
   }
@@ -315,6 +371,135 @@ class _DashboardScreenState extends State<DashboardScreen> {
         decoration: BoxDecoration(
             color: Tokens.gray50, borderRadius: BorderRadius.circular(8)),
         child: Text(label),
+      ),
+    );
+  }
+}
+
+class MentorCardWidget extends StatelessWidget {
+  const MentorCardWidget({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Tokens.surface,
+        borderRadius: BorderRadius.circular(Tokens.radius2xl),
+        boxShadow: Tokens.shadowSm,
+        border: Border.all(color: Tokens.gray200),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.school, color: Tokens.blue),
+              SizedBox(width: 8),
+              Text('Twój mentor',
+                  style: TextStyle(fontWeight: FontWeight.w600, color: Tokens.textDark)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: Tokens.blue.withOpacity(0.1),
+                child: const Text(
+                  'PW',
+                  style: TextStyle(
+                    color: Tokens.blue,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Piotr Wiśniewski',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Tokens.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Senior Frontend Developer',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Tokens.textMuted2,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Tokens.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Engineering',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Tokens.blue,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.star, color: Colors.amber, size: 14),
+                        const SizedBox(width: 2),
+                        const Text(
+                          '4.9',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Tokens.textDark,
+                          ),
+                        ),
+                        const Text(
+                          ' (24)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Tokens.textMuted2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                context.go('/mentor-rating?mentorName=Piotr Wiśniewski&taskTitle=Współpraca wdrażeniowa');
+              },
+              icon: const Icon(Icons.rate_review_outlined, size: 16),
+              label: const Text('Oceń współpracę'),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Tokens.blue),
+                foregroundColor: Tokens.blue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
