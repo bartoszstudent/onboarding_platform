@@ -8,6 +8,7 @@ import '../presentation/screens/users/users_list_screen.dart';
 import '../presentation/screens/settings/settings_screen.dart';
 import '../presentation/screens/branding_settings/branding_settings_screen.dart';
 import '../presentation/screens/profile/user_profile_screen.dart';
+import '../presentation/screens/competency/competency_path_screen.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/auth_state.dart';
 
@@ -80,6 +81,10 @@ class AppRouter {
             builder: (context, state) => const CompanyManagementScreen(),
             //body: Center(child: Text('Zarządzanie firmami - placeholder'))),
           ),
+          GoRoute(
+            path: '/competency',
+            builder: (context, state) => const CompetencyPathScreen(),
+          )
         ],
       ),
     ],
