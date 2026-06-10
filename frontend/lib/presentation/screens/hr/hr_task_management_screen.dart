@@ -3,7 +3,10 @@ import '../../../core/constants/design_tokens.dart';
 import '../../ui/app_card.dart';
 import '../../ui/input.dart';
 import '../../ui/stat_card.dart';
-
+import 'widgets/create_task_screen.dart';
+import 'widgets/edit_task_screen.dart';
+import 'widgets/assign_task_screen.dart';
+import 'widgets/delete_task_screen.dart';
 
 class OnboardingTask {
   final String id;
@@ -251,7 +254,13 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
               ],
             ),
             ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  barrierDismissible: true,
+                  builder: (_) => CreateTaskScreen(),
+                );
+              },
               icon: const Icon(Icons.add),
               label: const Text('Nowe zadanie'),
               style: ElevatedButton.styleFrom(
@@ -394,12 +403,30 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
                   onSelected: (value) {
                     switch (value) {
                       case 'edit':
+                        showDialog(
+                          context: context,
+                          builder: (_) => EditTaskScreen(
+                            task: task,
+                          ),
+                        );
                         break;
 
                       case 'assign':
+                        showDialog(
+                          context: context,
+                          builder: (_) => AssignTaskScreen(
+                            task: task,
+                          ),
+                        );
                         break;
 
                       case 'delete':
+                        showDialog(
+                          context: context,
+                          builder: (_) => DeleteTaskScreen(
+                            task: task,
+                          ),
+                        );
                         break;
                     }
                   },
