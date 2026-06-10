@@ -51,11 +51,13 @@ class StatusInfo {
 
 class PriorityInfo {
   final String label;
-  final Color color;
+  final Color background;
+  final Color textColor;
 
   const PriorityInfo({
     required this.label,
-    required this.color,
+    required this.background,
+    required this.textColor,
   });
 }
 
@@ -90,15 +92,18 @@ const statusConfig = {
 const priorityConfig = {
   'high': PriorityInfo(
     label: 'Wysoki',
-    color: Color(0xFFDC2626),
+    background: Color(0xFFFEE2E2),
+    textColor: Colors.red,
   ),
   'medium': PriorityInfo(
     label: 'Średni',
-    color: Color(0xFFD97706),
+    background: Color(0xFFFEF3C7),
+    textColor: Color(0xFF92400E),
   ),
   'low': PriorityInfo(
     label: 'Niski',
-    color: Color(0xFF64748B),
+    background: Tokens.gray100,
+    textColor: Tokens.mutedForeground,
   ),
 };
 
@@ -231,7 +236,7 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Zadania onboardingowe',
+                  'Zarządzanie zadaniami HR',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
@@ -240,7 +245,7 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Zarządzaj zadaniami pracowników',
+                  'Twórz i przypisuj zadania onboardingowe pracownikom',
                   style: TextStyle(color: Tokens.textMuted2),
                 ),
               ],
@@ -356,73 +361,177 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
     );
   }
 
-
   Widget _taskCard(OnboardingTask task) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 8,
-            children: [
-              _statusBadge(task.status),
-              _priorityBadge(task.priority),
-              _categoryBadge(task.category),
-            ],
-          ),
+    final status = statusConfig[task.status]!;
+    final priority = priorityConfig[task.priority]!;
 
-          const SizedBox(height: 12),
-
-          Text(
-            task.title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Tokens.textDark,
-            ),
-          ),
-
-          const SizedBox(height: 6),
-
-          Text(
-            task.description,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Tokens.textMuted2,
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${task.assignedTo.length} osób • ${task.assignedTo.take(2).join(', ')}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Tokens.textMuted2,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _statusBadge(task.status),
+                      _priorityBadge(task.priority),
+                      _categoryBadge(task.category),
+                    ],
                   ),
                 ),
-              ),
-              Text(
-                task.dueDate,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Tokens.mutedForeground,
+
+                PopupMenuButton<String>(
+                  icon: const Icon(
+                    Icons.more_vert,
+                    color: Tokens.mutedForeground,
+                  ),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'edit':
+                        break;
+
+                      case 'assign':
+                        break;
+
+                      case 'delete':
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Edytuj'),
+                    ),
+                    PopupMenuItem(
+                      value: 'assign',
+                      child: Text('Przypisz'),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Usuń'),
+                    ),
+                  ],
                 ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            Text(
+              task.title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Tokens.textDark,
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            Text(
+              task.description,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Tokens.textMuted2,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+
+            if (task.progress > 0 &&
+                task.status != 'completed') ...[
+              const SizedBox(height: 14),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius:
+                          BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: task.progress / 100,
+                        minHeight: 8,
+                        backgroundColor:
+                            Tokens.gray100,
+                        color: Tokens.blue,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${task.progress}%',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Tokens.textMuted2,
+                    ),
+                  ),
+                ],
               ),
             ],
-          ),
 
-          const SizedBox(height: 10),
+            const SizedBox(height: 14),
 
-          LinearProgressIndicator(
-            value: task.completionRate / 100,
-          ),
-        ],
+            Row(
+              children: [
+                Expanded(
+                  child: Wrap(
+                    spacing: 16,
+                    runSpacing: 8,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.calendar_today,
+                            size: 14,
+                            color:
+                                Tokens.mutedForeground,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            task.dueDate,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Tokens
+                                  .mutedForeground,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.group_outlined,
+                            size: 14,
+                            color:
+                                Tokens.mutedForeground,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${task.assignedTo.length} pracowników',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color:
+                                  Tokens.textMuted2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -459,13 +568,21 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
     final config = priorityConfig[priority]!;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: config.background,
+        borderRadius:
+            BorderRadius.circular(Tokens.radiusLg),
+      ),
       child: Text(
-        'Priorytet: ${config.label}',
+        config.label,
         style: TextStyle(
+          color: config.textColor,
           fontSize: 11,
           fontWeight: FontWeight.w500,
-          color: config.color,
         ),
       ),
     );
