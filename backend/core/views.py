@@ -14,7 +14,11 @@ from .serializers import CourseSerializer, CourseAssignmentSerializer
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import AllowAny
-from .models import Quiz, Company, UserCompany, Answer, Workspace, Course, CourseAssignment, Badge, UserBadge 
+from .models import (Quiz, Company, UserCompany, Answer, Workspace, Course, CourseAssignment, Badge, UserBadge, \
+                     OnboardingTemplate, \
+                     OnboardingTaskInstance, Onboarding, \
+                     OnboardingTemplate, \
+                     OnboardingTaskInstance, OnboardingTaskTemplate)
 from .serializers import QuizDetailSerializer, CompanySerializer
 from django.shortcuts import get_object_or_404
 from .models.workspaces import User  # lub get_user_model()
@@ -33,7 +37,11 @@ from .serializers import (
     CourseAssignmentSerializer,
     CompetencySerializer,
     CompetencyDetailSerializer,
-    BadgeSerializer
+    BadgeSerializer,
+    OnboardingTemplateSerializer,
+    OnboardingTaskTemplateSerializer,
+    OnboardingSerializer,
+    OnboardingTaskInstanceSerializer
 )
 
 from .models import Badge
@@ -647,3 +655,32 @@ class SectionProgressView(APIView):
             "total_sections": all_sections,
             "completed_sections": completed_sections,
         }, status=status.HTTP_200_OK)
+
+class OnboardingTemplateViewSet(viewsets.ModelViewSet):
+    queryset = OnboardingTemplate.objects.all().prefetch_related('onboardingtasktemplate_set')
+    serializer_class = OnboardingTemplateSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['workspace']
+    search_fields = ['name']
+
+
+class OnboardingTaskTemplateViewSet(viewsets.ModelViewSet):
+    queryset = OnboardingTaskTemplate.objects.all()
+    serializer_class = OnboardingTaskTemplateSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['template']
+
+
+class OnboardingViewSet(viewsets.ModelViewSet):
+    # prefetch_related optymalizuje zapytania SQL zapobiegając problemowi N+1
+    queryset = Onboarding.objects.all().select_related('template', 'user', 'mentor').prefetch_related('onboardingtaskinstance_set')
+    serializer_class = OnboardingSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['user', 'status', 'template']
+
+
+class OnboardingTaskInstanceViewSet(viewsets.ModelViewSet):
+    queryset = OnboardingTaskInstance.objects.all().select_related('onboarding', 'template_task', 'assigned_to_user')
+    serializer_class = OnboardingTaskInstanceSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['onboarding', 'assigned_to_user', 'status']
