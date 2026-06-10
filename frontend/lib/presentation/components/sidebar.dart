@@ -61,6 +61,14 @@ class _SidebarState extends State<Sidebar> {
           asset: 'assets/icons/settings.svg',
           label: 'Ustawienia'));
       base.add(const _MenuItem(
+          path: '/companies',
+          asset: 'assets/icons/book-open.svg',
+          label: 'Firmy'));
+      base.add(const _MenuItem(
+          path: '/competency',
+          asset: 'assets/icons/book-open.svg',
+          label: 'Ścieżki kompetencji'));
+      base.add(const _MenuItem(
           path: '/onboarding',
           asset: 'assets/icons/book-open.svg',
           label: 'Zadania onboardingowe'));

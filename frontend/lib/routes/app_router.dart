@@ -8,6 +8,7 @@ import '../presentation/screens/users/users_list_screen.dart';
 import '../presentation/screens/settings/settings_screen.dart';
 import '../presentation/screens/branding_settings/branding_settings_screen.dart';
 import '../presentation/screens/profile/user_profile_screen.dart';
+import '../presentation/screens/competency/competency_path_screen.dart';
 import '../presentation/screens/onboarding/onboarding_tasks_screen.dart';
 import '../presentation/screens/mentor_rating/mentor_rating_screen.dart';
 import '../presentation/screens/mentor_rating/mentor_assignment_screen.dart';
@@ -122,6 +123,10 @@ class AppRouter {
             path: '/onboarding',
             builder: (context, state) => const OnboardingTasksScreen(),
           ),
+          GoRoute(
+            path: '/competency',
+            builder: (context, state) => const CompetencyPathScreen(),
+          )
         ],
       ),
     ],
