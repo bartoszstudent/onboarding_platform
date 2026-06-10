@@ -7,6 +7,8 @@ import '../../../data/models/badge_list_item.dart';
 import '../../components/widgets/badge_card.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../data/models/user_model.dart';
+import '../../../data/services/badge_service.dart';
+import '../../../data/models/badge_model.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -18,6 +20,7 @@ class UserProfileScreen extends StatefulWidget {
 class _UserProfileScreenState extends State<UserProfileScreen> {
   UserModel? user;
   bool loading = true;
+  List<BadgeListItem> badges = [];
 
   static const roleLabels = {
     'super-admin': 'Super Administrator',
@@ -34,50 +37,40 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Future<void> _loadUser() async {
     final u = await AuthService.getCurrentUser();
+    if (u != null) {
+      try {
+        final userBadges = await BadgeService.fetchUserBadges(u.name);
+        final allBadges = await BadgeService.fetchAllBadges();
+        
+        setState(() {
+          badges = allBadges.map((b) {
+            final earned = userBadges.any((ub) => ub.id == b.id);
+            String color = 'blue';
+            if (b.rarity == BadgeRarity.rare) color = 'purple';
+            if (b.rarity == BadgeRarity.epic) color = 'amber';
+            if (b.rarity == BadgeRarity.legendary) color = 'red';
+
+            return BadgeListItem(
+              id: int.tryParse(b.id.replaceAll('b', '')) ?? 0,
+              name: b.name,
+              description: b.description,
+              icon: b.icon,
+              color: color,
+              earned: earned,
+              earnedDate: earned ? DateTime.now().subtract(const Duration(days: 2)) : null,
+            );
+          }).toList();
+        });
+      } catch (e) {
+        debugPrint('Błąd pobierania odznak: $e');
+      }
+    }
 
     setState(() {
       user = u;
       loading = false;
     });
   }
-
-  List<BadgeListItem> get mockBadges => [
-        BadgeListItem(
-          id: 1,
-          name: 'Pierwszy krok',
-          description: 'Ukończ swój pierwszy kurs',
-          icon: 'star',
-          color: 'blue',
-          earned: true,
-          earnedDate: DateTime(2026, 3, 15),
-        ),
-        BadgeListItem(
-          id: 2,
-          name: 'Mistrz nauki',
-          description: 'Ukończ 5 kursów w miesiącu',
-          icon: 'trophy',
-          color: 'amber',
-          earned: true,
-          earnedDate: DateTime(2026, 3, 20),
-        ),
-        BadgeListItem(
-          id: 3,
-          name: 'Seria 7 dni',
-          description: 'Naucz się coś przez 7 dni z rzędu',
-          icon: 'flame',
-          color: 'red',
-          earned: true,
-          earnedDate: DateTime(2026, 3, 18),
-        ),
-        BadgeListItem(
-          id: 4,
-          name: 'Perfekcjonista',
-          description: 'Uzyskaj 100% w 3 quizach',
-          icon: 'target',
-          color: 'purple',
-          earned: false,
-        ),
-      ];
 
   List<Map<String, dynamic>> get mockCourses => [
         {
@@ -296,8 +289,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   // Karta z odznakami
   Widget _badges() {
-    final earnedCount = mockBadges.where((b) => b.earned).length;
-    final totalCount = mockBadges.length;
+    final earnedCount = badges.where((b) => b.earned).length;
+    final totalCount = badges.length;
 
     return AppCard(
       child: Stack(
@@ -313,7 +306,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
                 const SizedBox(height: 12),
                 Column(
-                  children: mockBadges
+                  children: badges
                       .map((b) => Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: BadgeCard(badge: b),

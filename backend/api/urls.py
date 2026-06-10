@@ -1,7 +1,12 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet, UserAssignedCoursesViewSet, CourseAssignmentViewSet, create_company, list_companies, get_company, CompanyManagementViewSet, CompanyUsersViewSet, CompanyCourseViewSet, CompetencyViewSet, get_quiz_for_course
+from core.views import (QuizDetailView, SubmitQuizView, login_view, CourseViewSet,\
+                        UserAssignedCoursesViewSet, CourseAssignmentViewSet, create_company, \
+                        list_companies, get_company, CompanyManagementViewSet, \
+                        CompanyUsersViewSet, CompanyCourseViewSet, CompetencyViewSet, get_quiz_for_course, \
+                        OnboardingTemplateViewSet, OnboardingTaskTemplateViewSet, OnboardingViewSet,
+                        OnboardingTaskInstanceViewSet )
 from core.views import BadgeViewSet
 from core.views import SectionProgressView
 
@@ -12,6 +17,10 @@ router.register(r'course-assignments', CourseAssignmentViewSet)
 router.register(r'companies', CompanyManagementViewSet, basename='company')
 router.register(r'competencies', CompetencyViewSet, basename='competency')
 router.register(r'badges', BadgeViewSet)
+router.register(r'onboarding-templates', OnboardingTemplateViewSet, basename='onboarding-template')
+router.register(r'onboarding-task-templates', OnboardingTaskTemplateViewSet, basename='onboarding-task-template')
+router.register(r'onboardings', OnboardingViewSet, basename='onboarding')
+router.register(r'onboarding-task-instances', OnboardingTaskInstanceViewSet, basename='onboarding-task-instance')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
