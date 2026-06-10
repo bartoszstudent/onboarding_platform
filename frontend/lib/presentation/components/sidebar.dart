@@ -28,8 +28,26 @@ class _SidebarState extends State<Sidebar> {
           label: 'Kursy'),
     ];
 
-    // hide users/settings for super_admins (they manage companies elsewhere)
-    if (_role != 'super_admin') {
+    final isAdmin = _role == 'admin' || _role == 'super_admin' || _role == 'hr';
+
+    if (isAdmin) {
+      base.add(const _MenuItem(
+          path: '/badge-award',
+          asset: 'assets/icons/award.svg',
+          label: 'Przyznaj odznakę'));
+      base.add(const _MenuItem(
+          path: '/mentor-assign',
+          asset: 'assets/icons/users.svg',
+          label: 'Przypisz mentora'));
+    } else {
+      base.add(const _MenuItem(
+          path: '/mentor-rating',
+          asset: 'assets/icons/star.svg',
+          label: 'Oceń mentora'));
+    }
+
+    // hide users/settings for super_admins (they manage companies elsewhere) and employees
+    if (isAdmin && _role != 'super_admin') {
       base.add(const _MenuItem(
           path: '/users',
           asset: 'assets/icons/users.svg',
@@ -50,6 +68,10 @@ class _SidebarState extends State<Sidebar> {
           path: '/competency',
           asset: 'assets/icons/book-open.svg',
           label: 'Ścieżki kompetencji'));
+      base.add(const _MenuItem(
+          path: '/onboarding',
+          asset: 'assets/icons/book-open.svg',
+          label: 'Zadania onboardingowe'));
     }
 
     return base;

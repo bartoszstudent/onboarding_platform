@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 class QuizWidget extends StatefulWidget {
   final Map<String, dynamic> quiz;
-  const QuizWidget({super.key, required this.quiz});
+  final ValueChanged<bool>? onAnswered;
+  const QuizWidget({super.key, required this.quiz, this.onAnswered});
 
   @override
   State<QuizWidget> createState() => _QuizWidgetState();
@@ -83,7 +84,13 @@ class _QuizWidgetState extends State<QuizWidget> {
                 child: ElevatedButton(
                   onPressed: selected == null
                       ? null
-                      : () => setState(() => answered = true),
+                        : () {
+                          setState(() => answered = true);
+                          if (widget.onAnswered != null) {
+                            final isCorrect = selected == correct;
+                            widget.onAnswered!(isCorrect);
+                          }
+                        },
                   child: const Text("Sprawdź"),
                 ),
               ),
