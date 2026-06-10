@@ -26,7 +26,10 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from .models.progress import SectionProgress
 from .models.section import Section
-from .serializers import ( 
+from .serializers import (  
+    CourseDetailSerializer, 
+    CourseListSerializer,
+    CourseCreateUpdateSerializer,
     CourseSerializer, 
     CompanyUserAddSerializer, 
     UserCompanyListSerializer,
@@ -44,7 +47,7 @@ from .serializers import (
 from .models import Badge
 from .permissions import IsCompanyAdmin
 from .models.competencies import Competency
-
+from . import serializers
 User = get_user_model()
 
 # ile sekund ważny jest token (tu: 7 dni)
@@ -261,22 +264,6 @@ def get_company(request, pk):
         )
     serializer = CompanySerializer(company)
     return Response(serializer.data, status=status.HTTP_200_OK)
-class CourseViewSet(viewsets.ModelViewSet):
-    serializer_class = CourseSerializer
-    # Zmieniamy AllowAny na IsAuthenticated, aby mieć dostęp do request.user
-    permission_classes = [permissions.IsAuthenticated] 
-
-    def get_queryset(self):
-        user = self.request.user
-        # Wersja 2: Bardziej jawna (czytelniejsza)
-        try:
-            # Pobieramy firmę użytkownika (zakładając relację OneToOne w UserCompany)
-            user_company = user.user_company 
-            return Course.objects.filter(workspace__company=user_company.company)
-        except (UserCompany.DoesNotExist, AttributeError):
-            # Jeśli użytkownik nie ma przypisanej firmy, nie widzi żadnych kursów
-            return Course.objects.none()
-
 class UserAssignedCoursesViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API endpoint to view courses assigned to a specific user.
@@ -456,6 +443,73 @@ class CompanyUsersViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_200_OK)
 
 
+class CourseViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for Course management with full structure.
+    
+    GET /api/courses/                  → Lista kursów (basic info)
+    GET /api/courses/{id}/             → Szczegóły kursu (FULL NESTED STRUCTURE)
+    POST /api/courses/                 → Tworzenie kursu
+    PUT/PATCH /api/courses/{id}/       → Edycja kursu
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Pobierz kursy użytkownika z optymalizacją.
+        prefetch_related() redukuje liczbę SQL queries.
+        """
+        user = self.request.user
+        try:
+            user_company = UserCompany.objects.get(user=user)
+            queryset = Course.objects.filter(
+                workspace__company=user_company.company
+            ).prefetch_related(
+                'sections', 
+                'sections__blocks',
+                'sections__blocks__quiz',
+            )
+            return queryset
+        except UserCompany.DoesNotExist:
+            return Course.objects.none()
+
+    def get_serializer_class(self):
+        """Użyj odpowiedniego serializera w zależności od akcji"""
+        if self.action == 'retrieve':
+            return CourseDetailSerializer
+        elif self.action == 'list':
+            return CourseListSerializer
+        elif self.action in ['create']:
+            return CourseCreateUpdateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return CourseCreateUpdateSerializer
+        return CourseSerializer
+
+    def perform_create(self, serializer):
+        """Automatycznie ustaw workspace na workspace użytkownika"""
+        try:
+            user_company = UserCompany.objects.get(user=self.request.user)
+            workspace = user_company.company.workspaces.first()
+            serializer.save(workspace=workspace)
+        except Exception as e:
+            raise serializers.ValidationError(
+                {"workspace": "Nie można określić workspace użytkownika."}
+            )
+
+    @action(detail=True, methods=['get'])
+    def structure(self, request, pk=None):
+        """
+        Dodatkowy endpoint do pobierania SAMEJ struktury kursu
+        (sekcje + bloki) bez metadanych kursu.
+        
+        GET /api/courses/{id}/structure/ → { sections: [...] }
+        """
+        course = self.get_object()
+        sections = course.sections.all().prefetch_related('blocks')
+        from .serializers import SectionSerializer
+        data = SectionSerializer(sections, many=True).data
+        return Response({"course_id": course.id, "sections": data})
+
 class CompanyCourseViewSet(viewsets.ViewSet):
     """
     Zarządzanie kursami w kontekście firmy.
@@ -520,7 +574,6 @@ class CompanyCourseViewSet(viewsets.ViewSet):
             return Response({"assigned": len(assignments)}, status=status.HTTP_200_OK)
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 class CompetencyViewSet(viewsets.ModelViewSet):
     """
