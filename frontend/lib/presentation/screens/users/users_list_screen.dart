@@ -1,8 +1,7 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
+import 'package:go_router/go_router.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../core/utils/token_manager.dart';
 
@@ -316,6 +315,14 @@ class _UsersListScreenState extends State<UsersListScreen> {
                                         );
                                       },
                                       child: const Text('Przypisz kursy'),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    TextButton(
+                                      onPressed: () {
+                                        final name = _nameFromEmail(email);
+                                        context.go('/mentor-assign?taskTitle=Wdrożenie $name');
+                                      },
+                                      child: const Text('Przypisz mentora'),
                                     ),
                                   ],
                                 ),
