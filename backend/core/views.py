@@ -52,6 +52,7 @@ from .models.competencies import Competency
 from . import serializers
 from .models import UserBadge
 from .serializers import UserBadgeSerializer
+from .models import CourseAssignment, UserBadge
 User = get_user_model()
 
 # ile sekund ważny jest token (tu: 7 dni)
@@ -747,3 +748,65 @@ class UserBadgeViewSet(viewsets.ModelViewSet):
         if user_id:
             return self.queryset.filter(user_id=user_id)
         return self.queryset
+    
+class DashboardView(APIView):
+    """
+    Endpoint agregujący statystyki i aktywności dla Dashboardu.
+    Zwraca inne dane dla Admina/HR, a inne dla zwykłego pracownika.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user_company = UserCompany.objects.select_related('company').get(user=request.user)
+            company = user_company.company
+            role = user_company.role
+        except UserCompany.DoesNotExist:
+            return Response({"error": "Brak przypisanej firmy."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # --- DANE DLA ADMINA / HR ---
+        if role in ['admin', 'super_admin', 'hr']:
+            employees_count = UserCompany.objects.filter(company=company).count()
+            courses_count = Course.objects.filter(workspace__company=company).count()
+            
+            recent_onboardings = OnboardingTaskInstance.objects.filter(
+                onboarding__template__workspace__company=company
+            ).select_related('assigned_to_user', 'template_task').order_by('-id')[:5]
+
+            activities = []
+            for task in recent_onboardings:
+                user_name = f"{task.assigned_to_user.first_name} {task.assigned_to_user.last_name}".strip() or task.assigned_to_user.email
+                status_map = {"pending": "Rozpoczął", "in_progress": "Kontynuuje", "completed": "Ukończył"}
+                
+                activities.append({
+                    "user": user_name,
+                    "action": status_map.get(task.status, "Aktualizacja zadania"),
+                    "course": task.template_task.title,
+                    "time": "Ostatnio"
+                })
+
+            return Response({
+                "stats": {
+                    "courses": courses_count,
+                    "employees": employees_count,
+                    "avg_completion_hours": 4.5
+                },
+                "activities": activities
+            }, status=status.HTTP_200_OK)
+
+        # --- DANE DLA PRACOWNIKA ---
+        else:
+            assignments = CourseAssignment.objects.filter(user=request.user)
+            # Zliczamy ukończone (gdzie status to explicit 'completed' lub string zawierający '100')
+            completed_count = assignments.filter(status__icontains='100').count() + assignments.filter(status='completed').count()
+            in_progress_count = assignments.exclude(status='completed').exclude(status__icontains='100').count()
+
+            return Response({
+                "stats": {
+                    "completed_courses": completed_count,
+                    "in_progress_courses": in_progress_count,
+                    "learning_time": "12h",
+                    "streak": 1
+                },
+                "activities": [] # Puste dla pracownika
+            }, status=status.HTTP_200_OK)

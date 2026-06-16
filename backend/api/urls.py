@@ -8,6 +8,7 @@ from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet
 from core.views import BadgeViewSet
 from core.views import SectionProgressView
 from core.views import UserBadgeViewSet
+from core.views import DashboardView 
 
 # Create a router and register our viewsets with it.
 router = DefaultRouter()
@@ -52,4 +53,5 @@ urlpatterns = [
     path('companies/<int:company_pk>/courses/assign/', CompanyCourseViewSet.as_view({'post': 'assign_users'})),
 
     path('api/section-progress/', SectionProgressView.as_view(), name='section-progress'),
+    path('api/dashboard/', DashboardView.as_view(), name='api-dashboard'),
 ]

@@ -6,6 +6,9 @@ import '../../../core/constants/design_tokens.dart';
 import '../../../data/services/dashboard_service.dart';
 import '../../../data/models/dashboard_models.dart';
 import '../../../data/services/auth_service.dart';
+import '../../../data/models/user_model.dart';
+import '../../../data/services/badge_service.dart';
+import '../../../data/models/badge_model.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -19,7 +22,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late Future<List<ActivityItem>> _activitiesFuture;
 
   String? _role;
-  String? _userName;
+  UserModel? _user;
   bool _loadingUser = true;
 
   @override
@@ -37,7 +40,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) {
         setState(() {
           _role = role;
-          _userName = user?.name;
+          _user = user;
           _loadingUser = false;
         });
       }
@@ -78,8 +81,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Text(
                 isAdmin
-                    ? 'Witaj, ${_userName ?? 'admin'}! 👋'
-                    : 'Witaj, ${_userName ?? 'pracowniku'}! 👋',
+                    ? 'Witaj, ${_user?.name ?? 'admin'}! 👋'
+                    : 'Witaj, ${_user?.name ?? 'pracowniku'}! 👋',
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge
@@ -113,7 +116,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 20),
 
         if (isAdmin) ...[
-          // Stats + activities fetched from service
+          // Stats for Admin
           FutureBuilder<DashboardStats>(
             future: _statsFuture,
             builder: (context, snap) {
@@ -122,13 +125,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     height: 120,
                     child: Center(child: CircularProgressIndicator()));
               }
-              if (snap.hasError) {
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('Błąd ładowania statystyk: ${snap.error}'),
-                );
-              }
-              final stats = snap.data!;
+              final stats = snap.data ?? DashboardStats();
 
               return LayoutBuilder(builder: (context, constraints) {
                 final width = constraints.maxWidth;
@@ -143,21 +140,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             iconAsset: 'assets/icons/book-open.svg',
                             title: 'Liczba kursów',
                             value: stats.courses.toString(),
-                            delta: '+3 w tym miesiącu')),
+                            delta: 'Na podstawie bazy')),
                     SizedBox(
                         width: cardWidth,
                         child: StatCard(
                             iconAsset: 'assets/icons/users.svg',
                             title: 'Liczba pracowników',
                             value: stats.employees.toString(),
-                            delta: '+12 w tym miesiącu')),
+                            delta: 'Na podstawie bazy')),
                     SizedBox(
                         width: cardWidth,
                         child: StatCard(
                             iconAsset: 'assets/icons/clock.svg',
-                            title: 'Średni czas ukończenia',
+                            title: 'Średni czas',
                             value: '${stats.avgCompletionHours}h',
-                            delta: '-0.5h vs poprzedni')),
+                            delta: 'Szacunkowo')),
                   ],
                 );
               });
@@ -166,7 +163,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 20),
 
-          // Chart + quick actions
+          // Wykres i akcje na razie pozostają statyczne
           LayoutBuilder(builder: (context, constraints) {
             final width = constraints.maxWidth;
             final leftWidth = width >= 1000 ? width * 0.68 : width;
@@ -187,12 +184,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Row(
                           children: [
-                            SvgPicture.asset('assets/icons/chart-bar.svg',
-                                width: 18, height: 18, color: Tokens.blue),
+                            SvgPicture.asset('assets/icons/chart-bar.svg', width: 18, height: 18, color: Tokens.blue),
                             const SizedBox(width: 8),
-                            const Text('Postęp pracowników w tym tygodniu',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w600, fontSize: 14)),
+                            const Text('Aktywność (Wykres pokazowy)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -202,25 +196,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: List.generate(7, (i) {
-                              final heights = [
-                                0.45,
-                                0.55,
-                                0.6,
-                                0.58,
-                                0.72,
-                                0.4,
-                                0.35
-                              ];
+                              final heights = [0.45, 0.55, 0.6, 0.58, 0.72, 0.4, 0.35];
                               return Expanded(
                                 child: Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6),
                                   child: Container(
                                     height: 200 * heights[i],
-                                    decoration: BoxDecoration(
-                                      color: Tokens.blue,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
+                                    decoration: BoxDecoration(color: Tokens.blue, borderRadius: BorderRadius.circular(6)),
                                   ),
                                 ),
                               );
@@ -235,25 +217,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 SizedBox(
                   width: rightWidth,
                   child: Container(
-                    decoration: BoxDecoration(
-                        color: Tokens.surface,
-                        borderRadius: BorderRadius.circular(Tokens.radius2xl),
-                        boxShadow: Tokens.shadowSm),
+                    decoration: BoxDecoration(color: Tokens.surface, borderRadius: BorderRadius.circular(Tokens.radius2xl), boxShadow: Tokens.shadowSm),
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Szybkie akcje',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 14)),
+                        const Text('Szybkie akcje', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                         const SizedBox(height: 12),
                         Column(
                           children: [
-                            _quickAction(context, 'Dodaj nowy kurs'),
+                            _quickAction(context, 'Dodaj nowy kurs', () => context.push('/courses/create')),
                             const SizedBox(height: 8),
-                            _quickAction(context, 'Zaproś pracownika'),
-                            const SizedBox(height: 8),
-                            _quickAction(context, 'Generuj raport'),
+                            _quickAction(context, 'Zaproś pracownika', () => context.push('/users/create')),
                           ],
                         )
                       ],
@@ -266,47 +241,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 20),
 
-          // Recent activities table
+          // Ostatnie aktywności z bazy
           FutureBuilder<List<ActivityItem>>(
             future: _activitiesFuture,
             builder: (context, snap) {
               if (snap.connectionState != ConnectionState.done) {
-                return const SizedBox(
-                    height: 120,
-                    child: Center(child: CircularProgressIndicator()));
-              }
-              if (snap.hasError) {
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('Błąd ładowania aktywności: ${snap.error}'),
-                );
+                return const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()));
               }
               final activities = snap.data ?? [];
 
               return Container(
-                decoration: BoxDecoration(
-                    color: Tokens.surface,
-                    borderRadius: BorderRadius.circular(Tokens.radius2xl),
-                    boxShadow: Tokens.shadowSm),
+                decoration: BoxDecoration(color: Tokens.surface, borderRadius: BorderRadius.circular(Tokens.radius2xl), boxShadow: Tokens.shadowSm),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Text('Ostatnie aktywności',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      child: Text('Ostatnie aktywności z bazy', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                     ),
                     const Divider(height: 1),
+                    if (activities.isEmpty)
+                       const Padding(padding: EdgeInsets.all(16), child: Text("Brak ostatnich aktywności.")),
                     ...activities.map((r) {
                       return Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
-                        decoration: const BoxDecoration(
-                            border: Border(
-                                bottom: BorderSide(color: Tokens.gray200))),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Tokens.gray200))),
                         child: Row(
                           children: [
                             Expanded(flex: 2, child: Text(r.user)),
@@ -323,198 +282,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
             },
           ),
         ] else ...[
-          // Employee dashboard views
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              final isWide = width > 900;
+          // Employee dashboard views z podpiętymi danymi API
+          FutureBuilder<DashboardStats>(
+            future: _statsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
+              }
+              
+              final stats = snapshot.data ?? DashboardStats();
+              
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  final isWide = width > 900;
 
-              return isWide
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            children: const [
-                              UserStatsWidget(),
-                              SizedBox(height: 20),
-                              MentorCardWidget(),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        const Expanded(child: BadgeWidget()),
-                      ],
-                    )
-                  : Column(
-                      children: const [
-                        UserStatsWidget(),
-                        SizedBox(height: 20),
-                        MentorCardWidget(),
-                        SizedBox(height: 20),
-                        BadgeWidget(),
-                      ],
-                    );
-            },
+                  return isWide
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  UserStatsWidget(stats: stats),
+                                  const SizedBox(height: 20),
+                                  const MentorCardWidget(), // Mentor nadal statyczny (Punkt 5)
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Expanded(child: BadgeWidget(userId: _user?.id.toString() ?? '0')),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            UserStatsWidget(stats: stats),
+                            const SizedBox(height: 20),
+                            const MentorCardWidget(),
+                            const SizedBox(height: 20),
+                            BadgeWidget(userId: _user?.id.toString() ?? '0'),
+                          ],
+                        );
+                },
+              );
+            }
           ),
         ],
       ],
     );
   }
 
-  Widget _quickAction(BuildContext context, String label) {
+  Widget _quickAction(BuildContext context, String label, VoidCallback onTap) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        decoration: BoxDecoration(
-            color: Tokens.gray50, borderRadius: BorderRadius.circular(8)),
+        decoration: BoxDecoration(color: Tokens.gray50, borderRadius: BorderRadius.circular(8)),
         child: Text(label),
       ),
     );
   }
 }
 
-class MentorCardWidget extends StatelessWidget {
-  const MentorCardWidget({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Tokens.surface,
-        borderRadius: BorderRadius.circular(Tokens.radius2xl),
-        boxShadow: Tokens.shadowSm,
-        border: Border.all(color: Tokens.gray200),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: const [
-              Icon(Icons.school, color: Tokens.blue),
-              SizedBox(width: 8),
-              Text('Twój mentor',
-                  style: TextStyle(fontWeight: FontWeight.w600, color: Tokens.textDark)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: Tokens.blue.withOpacity(0.1),
-                child: const Text(
-                  'PW',
-                  style: TextStyle(
-                    color: Tokens.blue,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Piotr Wiśniewski',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Tokens.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Senior Frontend Developer',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Tokens.textMuted2,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Tokens.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'Engineering',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Tokens.blue,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.star, color: Colors.amber, size: 14),
-                        const SizedBox(width: 2),
-                        const Text(
-                          '4.9',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Tokens.textDark,
-                          ),
-                        ),
-                        const Text(
-                          ' (24)',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Tokens.textMuted2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                context.go('/mentor-rating?mentorName=Piotr Wiśniewski&taskTitle=Współpraca wdrażeniowa');
-              },
-              icon: const Icon(Icons.rate_review_outlined, size: 16),
-              label: const Text('Oceń współpracę'),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Tokens.blue),
-                foregroundColor: Tokens.blue,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
+// --- ZAKTUALIZOWANY WIDŻET PRACOWNIKA ---
 class UserStatsWidget extends StatelessWidget {
-  const UserStatsWidget({super.key});
+  final DashboardStats stats;
+  const UserStatsWidget({super.key, required this.stats});
 
   @override
   Widget build(BuildContext context) {
-    const completedCourses = 3;
-    const inProgressCourses = 2;
-    const totalLearningTime = '24h';
-    const currentStreak = 5;
-
     return Container(
       decoration: BoxDecoration(
         color: Tokens.surface,
@@ -529,27 +366,25 @@ class UserStatsWidget extends StatelessWidget {
             children: const [
               Icon(Icons.trending_up, color: Colors.blue),
               SizedBox(width: 8),
-              Text('Twoje statystyki',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
+              Text('Twoje statystyki', style: TextStyle(fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 16),
-
           Column(
             children: [
               Row(
                 children: [
-                  Expanded(child: _box('Ukończone', '3', Colors.blue, 'assets/icons/circle-check-big.svg')),
+                  Expanded(child: _box('Ukończone', '${stats.completedCourses}', Colors.blue, 'assets/icons/circle-check-big.svg')),
                   const SizedBox(width: 12),
-                  Expanded(child: _box('W trakcie', '2', Colors.purple, 'assets/icons/book-open.svg')),
+                  Expanded(child: _box('W trakcie', '${stats.inProgressCourses}', Colors.purple, 'assets/icons/book-open.svg')),
                 ],
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: _box('Czas nauki', '24h', Colors.green, 'assets/icons/clock.svg')),
+                  Expanded(child: _box('Czas nauki', stats.learningTime, Colors.green, 'assets/icons/clock.svg')),
                   const SizedBox(width: 12),
-                  Expanded(child: _box('Seria dni', '5', Colors.orange, 'assets/icons/flame.svg')),
+                  Expanded(child: _box('Seria dni', '${stats.streak}', Colors.orange, 'assets/icons/flame.svg')),
                 ],
               ),
             ],
@@ -562,8 +397,108 @@ class UserStatsWidget extends StatelessWidget {
   Widget _box(String title, String value, Color color, String iconPath) {
     return Container(
       padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: SvgPicture.asset(iconPath, width: 16, height: 16, colorFilter: ColorFilter.mode(color, BlendMode.srcIn)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 12)),
+                const SizedBox(height: 4),
+                Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- ZAKTUALIZOWANY WIDŻET ODZNAK (ZAPYTANIE Z PUNKTU 1) ---
+class BadgeWidget extends StatelessWidget {
+  final String userId;
+  const BadgeWidget({super.key, required this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: Tokens.surface,
+        borderRadius: BorderRadius.circular(Tokens.radius2xl),
+        boxShadow: Tokens.shadowSm,
+      ),
+      padding: const EdgeInsets.all(16),
+      child: FutureBuilder<List<BadgeModel>>(
+        future: BadgeService.fetchUserBadges(userId),
+        builder: (context, snapshot) {
+          final earnedBadges = snapshot.data ?? [];
+          final isLoading = snapshot.connectionState == ConnectionState.waiting;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.emoji_events, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text('Zdobyte odznaki', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  Text('${earnedBadges.length} zdobytych', style: const TextStyle(fontSize: 12)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              if (isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (earnedBadges.isEmpty)
+                Column(
+                  children: const [
+                    SizedBox(height: 20),
+                    Icon(Icons.emoji_events_outlined, size: 40, color: Colors.grey),
+                    SizedBox(height: 8),
+                    Text('Brak zdobytych odznak. Czas rozpocząć kurs!'),
+                  ],
+                )
+              else
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: earnedBadges.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 3.8,
+                  ),
+                  itemBuilder: (context, index) {
+                    final b = earnedBadges[index];
+                    return _badgeBox(b);
+                  },
+                ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
+  Widget _badgeBox(BadgeModel b) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -572,35 +507,19 @@ class UserStatsWidget extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: SvgPicture.asset(
-              iconPath,
-              width: 16,
-              height: 16,
-              fit: BoxFit.contain,
-              colorFilter: ColorFilter.mode(
-                color,
-                BlendMode.srcIn,
-              ),
+              'assets/icons/star.svg', // Domyślna ikona, można zmienić pod pole b.icon
+              width: 16, height: 16,
+              colorFilter: const ColorFilter.mode(Colors.blue, BlendMode.srcIn),
             ),
           ),
-
           const SizedBox(width: 10),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 12),
-                ),
+                Text(b.name, style: const TextStyle(fontSize: 14, color: Colors.black), maxLines: 1, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text(b.description ?? '', style: const TextStyle(fontSize: 10, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -609,154 +528,49 @@ class UserStatsWidget extends StatelessWidget {
     );
   }
 }
-class BadgeWidget extends StatelessWidget {
-  const BadgeWidget({super.key});
 
+// Mentor z racji integracji w następnym punkcie pozostaje nienaruszony
+class MentorCardWidget extends StatelessWidget {
+  const MentorCardWidget({super.key});
   @override
   Widget build(BuildContext context) {
-    final badges = [
-      _badge('Pierwszy kurs', 'Ukończono pierwszy kurs', 'assets/icons/star.svg', true),
-      _badge('5 kursów', 'Ukończono 5 kursów', 'assets/icons/trophy.svg', true),
-      _badge('Streak 7 dni', '7 dni nauki z rzędu', 'assets/icons/flame.svg', false),
-      _badge('Perfekcyjny wynik', '100% z testu', 'assets/icons/award.svg', false),
-    ];
-
-    final earned = badges.where((b) => b.earned).toList();
-
     return Container(
-      decoration: BoxDecoration(
-        color: Tokens.surface,
-        borderRadius: BorderRadius.circular(Tokens.radius2xl),
-        boxShadow: Tokens.shadowSm,
-      ),
+      decoration: BoxDecoration(color: Tokens.surface, borderRadius: BorderRadius.circular(Tokens.radius2xl), border: Border.all(color: Tokens.gray200)),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          /// HEADER
+          Row(children: const [Icon(Icons.school, color: Tokens.blue), SizedBox(width: 8), Text('Twój mentor', style: TextStyle(fontWeight: FontWeight.w600, color: Tokens.textDark))]),
+          const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: const [
-                  Icon(Icons.emoji_events, color: Colors.blue),
-                  SizedBox(width: 8),
-                  Text('Zdobyte odznaki',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                ],
+              CircleAvatar(radius: 28, backgroundColor: Tokens.blue.withOpacity(0.1), child: const Text('PW', style: TextStyle(color: Tokens.blue, fontWeight: FontWeight.bold, fontSize: 20))),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Piotr Wiśniewski', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Tokens.textDark)),
+                    const SizedBox(height: 4),
+                    const Text('Senior Frontend Developer', style: TextStyle(fontSize: 13, color: Tokens.textMuted2)),
+                    const SizedBox(height: 6),
+                  ],
+                ),
               ),
-              Text('${earned.length} / ${badges.length}',
-                  style: const TextStyle(fontSize: 12)),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          /// CONTENT
-          if (earned.isEmpty)
-            Column(
-              children: const [
-                SizedBox(height: 20),
-                Icon(Icons.emoji_events_outlined, size: 40, color: Colors.grey),
-                SizedBox(height: 8),
-                Text('Brak zdobytych odznak'),
-              ],
-            )
-          else
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: badges.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 3.8,
-              ),
-              itemBuilder: (context, index) {
-                final b = badges[index];
-                return _badgeBox(b);
-              },
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => context.go('/mentor-rating?mentorName=Piotr Wiśniewski&taskTitle=Współpraca wdrażeniowa'),
+              icon: const Icon(Icons.rate_review_outlined, size: 16),
+              label: const Text('Oceń współpracę'),
+              style: OutlinedButton.styleFrom(side: const BorderSide(color: Tokens.blue), foregroundColor: Tokens.blue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             ),
+          ),
         ],
       ),
     );
   }
-
-  _Badge _badge(String name, String desc, String iconPath, bool earned) {
-    return _Badge(name, desc, iconPath, earned);
-  }
-}
-
-class _Badge {
-  final String name;
-  final String description;
-  final String iconPath;
-  final bool earned;
-
-  _Badge(this.name, this.description, this.iconPath, this.earned);
-}
-
-Widget _badgeBox(_Badge b) {
-  return Container(
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      color: b.earned
-          ? Colors.blue.withOpacity(0.08)
-          : Colors.grey.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ICON
-        Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: SvgPicture.asset(
-            b.iconPath,
-            width: 16,
-            height: 16,
-            colorFilter: ColorFilter.mode(
-              b.earned ? Colors.blue : Colors.grey,
-              BlendMode.srcIn,
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 10),
-
-        // TEXT
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // name + lock in same row
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      b.name,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: b.earned ? Colors.black : Colors.grey,
-                      ),
-                    ),
-                  ),
-                  if (!b.earned)
-                    const Icon(Icons.lock, size: 12, color: Colors.grey),
-                ],
-              ),
-
-              const SizedBox(height: 4),
-
-              Text(
-                b.description,
-                style: const TextStyle(fontSize: 10, color: Colors.grey),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
 }
