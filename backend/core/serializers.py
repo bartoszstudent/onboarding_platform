@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from .models.workspaces import Company
 from .models import UserCompany, Company, CourseAssignment, OnboardingTemplate, \
     OnboardingTaskTemplate, Onboarding, \
-    OnboardingTaskInstance, MentorRating
+    OnboardingTaskInstance, Quiz, MentorRating
 from .models.competencies import Competency, CompetencyCourse
 from .models import Badge, Question, Answer
 
@@ -474,6 +474,7 @@ class CompetencyDetailSerializer(serializers.ModelSerializer):
         courses = [cc.course for cc in competency_courses]
         return CourseSerializer(courses, many=True).data
 
+
 # ==========================================
 # 1. SZABLONY ONBOARDINGU (Templates)
 # ==========================================
@@ -572,8 +573,8 @@ class OnboardingSerializer(serializers.ModelSerializer):
         OnboardingTaskInstance.objects.bulk_create(task_instances)
 
         return onboarding
-      
-    class MentorRatingSerializer(serializers.ModelSerializer):
+
+class MentorRatingSerializer(serializers.ModelSerializer):
     # Wyciągamy ID użytkownika automatycznie z requestu w ViewSetie
     class Meta:
         model = MentorRating

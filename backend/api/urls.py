@@ -1,12 +1,9 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from core.views import (QuizDetailView, SubmitQuizView, login_view, CourseViewSet,\
-                        UserAssignedCoursesViewSet, CourseAssignmentViewSet, create_company, \
-                        list_companies, get_company, CompanyManagementViewSet, \
-                        CompanyUsersViewSet, CompanyCourseViewSet, CompetencyViewSet, get_quiz_for_course, \
-                        OnboardingTemplateViewSet, OnboardingTaskTemplateViewSet, OnboardingViewSet,
-                        OnboardingTaskInstanceViewSet, MentorRatingViewSet )
+from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet, UserAssignedCoursesViewSet, \
+    CourseAssignmentViewSet, create_company, list_companies, get_company, CompanyManagementViewSet, CompanyUsersViewSet, \
+    CompanyCourseViewSet, CompetencyViewSet, get_quiz_for_course, MentorRatingViewSet
 from core.views import BadgeViewSet
 from core.views import SectionProgressView
 
@@ -17,10 +14,6 @@ router.register(r'course-assignments', CourseAssignmentViewSet)
 router.register(r'companies', CompanyManagementViewSet, basename='company')
 router.register(r'competencies', CompetencyViewSet, basename='competency')
 router.register(r'badges', BadgeViewSet)
-router.register(r'onboarding-templates', OnboardingTemplateViewSet, basename='onboarding-template')
-router.register(r'onboarding-task-templates', OnboardingTaskTemplateViewSet, basename='onboarding-task-template')
-router.register(r'onboardings', OnboardingViewSet, basename='onboarding')
-router.register(r'onboarding-task-instances', OnboardingTaskInstanceViewSet, basename='onboarding-task-instance')
 router.register(r'ratings', MentorRatingViewSet, basename='mentor-rating')
 
 urlpatterns = [
@@ -35,7 +28,7 @@ urlpatterns = [
     # Custom URL for getting courses for a specific user
     path('api/users/<int:user_id>/courses/', UserAssignedCoursesViewSet.as_view({'get': 'list'}), name='user-courses'),
     path('api/quizzes/<int:pk>/', QuizDetailView.as_view(), name='quiz-detail'),
-    
+
     # URL to submit answers for a quiz
     path('api/quizzes/<int:pk>/submit/', SubmitQuizView.as_view(), name='quiz-submit'),
     # Get quiz for a specific course
@@ -47,7 +40,7 @@ urlpatterns = [
 
     # 2. Zarządzanie kursami: GET list, POST add
     path('companies/<int:company_pk>/courses/', CompanyCourseViewSet.as_view({'get': 'list', 'post': 'create'})),
-    
+
     # 3. Przypisywanie do kursu: POST assign
     path('companies/<int:company_pk>/courses/assign/', CompanyCourseViewSet.as_view({'post': 'assign_users'})),
 
