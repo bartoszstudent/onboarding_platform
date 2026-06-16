@@ -3,22 +3,24 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.core import signing
+from django.db.models import Avg, Count
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from rest_framework import viewsets, permissions, status, generics, views
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import viewsets, permissions, status, generics, views, filters
 from rest_framework.exceptions import ValidationError
 from .models.training import Course, CourseAssignment
-from .serializers import CourseSerializer, CourseAssignmentSerializer
+from .serializers import CourseSerializer, CourseAssignmentSerializer, MentorStatsSerializer, MentorRatingSerializer
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, action
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from .models import (Quiz, Company, UserCompany, Answer, Workspace, Course, CourseAssignment, Badge, UserBadge, \
                      OnboardingTemplate, \
                      OnboardingTaskInstance, Onboarding, \
                      OnboardingTemplate, \
-                     OnboardingTaskInstance, OnboardingTaskTemplate)
+                     OnboardingTaskInstance, OnboardingTaskTemplate, MentorRating)
 from .serializers import QuizDetailSerializer, CompanySerializer
 from django.shortcuts import get_object_or_404
 from .models.workspaces import User  # lub get_user_model()
@@ -656,6 +658,49 @@ class SectionProgressView(APIView):
             "completed_sections": completed_sections,
         }, status=status.HTTP_200_OK)
 
+class MentorRatingViewSet(viewsets.ModelViewSet):
+    queryset = MentorRating.objects.all()
+    serializer_class = MentorRatingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Możliwość filtrowania ocen po mentor_id w query params:
+        GET /api/ratings/?mentor_id=5
+        """
+        queryset = super().get_queryset()
+        mentor_id = self.request.query_params.get('mentor_id')
+        if mentor_id:
+            queryset = queryset.filter(mentor_id=mentor_id)
+        return queryset
+
+    @action(detail=False, url_path='mentor/(?P<mentor_id>\d+)/stats', methods=['get'])
+    def mentor_stats(self, request, mentor_id=None):
+        """
+        Endpoint agregujący: GET /api/ratings/mentor/{mentor_id}/stats/
+        """
+        # Sprawdzamy czy mentor w ogóle istnieje w systemie
+        if not User.objects.filter(id=mentor_id).exists():
+            return Response(
+                {"error": "Mentor nie istnieje."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Agregacja danych z bazy
+        stats = MentorRating.objects.filter(mentor_id=mentor_id).aggregate(
+            average_rating=Avg('rating'),
+            total_ratings=Count('id')
+        )
+
+        # Obsługa przypadku, gdy mentor nie ma jeszcze żadnych ocen
+        if stats['average_rating'] is None:
+            stats['average_rating'] = 0.0
+
+        # Zaokrąglenie średniej do 2 miejsc po przecinku
+        stats['average_rating'] = round(stats['average_rating'], 2)
+
+        serializer = MentorStatsSerializer(stats)
+        return Response(serializer.data, status=status.HTTP_00_OK)
 class OnboardingTemplateViewSet(viewsets.ModelViewSet):
     queryset = OnboardingTemplate.objects.all().prefetch_related('onboardingtasktemplate_set')
     serializer_class = OnboardingTemplateSerializer
