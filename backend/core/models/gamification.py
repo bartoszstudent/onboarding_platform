@@ -17,6 +17,10 @@ class Badge(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     image = models.ImageField(upload_to="badge_images/", blank=True, null=True)
+    icon = models.CharField(max_length=50, default='star')
+    category = models.CharField(max_length=100, default='Ogólne')
+    rarity = models.CharField(max_length=50, default='common') # common, rare, epic, legendary
+    xp_reward = models.IntegerField(default=100)
 
     def __str__(self):
         return self.name

@@ -50,6 +50,8 @@ from .models import Badge
 from .permissions import IsCompanyAdmin
 from .models.competencies import Competency
 from . import serializers
+from .models import UserBadge
+from .serializers import UserBadgeSerializer
 User = get_user_model()
 
 # ile sekund ważny jest token (tu: 7 dni)
@@ -729,3 +731,19 @@ class OnboardingTaskInstanceViewSet(viewsets.ModelViewSet):
     serializer_class = OnboardingTaskInstanceSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['onboarding', 'assigned_to_user', 'status']
+
+class UserBadgeViewSet(viewsets.ModelViewSet):
+    """
+    Endpoint pozwalający na ręczne przydzielanie i pobieranie 
+    odznak konkretnego użytkownika.
+    """
+    queryset = UserBadge.objects.all()
+    serializer_class = UserBadgeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Filtrowanie odznak po konkretnym użytkowniku: ?user_id=X
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            return self.queryset.filter(user_id=user_id)
+        return self.queryset

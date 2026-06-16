@@ -7,6 +7,7 @@ from core.views import QuizDetailView, SubmitQuizView, login_view, CourseViewSet
     OnboardingTaskTemplateViewSet, OnboardingViewSet,OnboardingTaskInstanceViewSet
 from core.views import BadgeViewSet
 from core.views import SectionProgressView
+from core.views import UserBadgeViewSet
 
 # Create a router and register our viewsets with it.
 router = DefaultRouter()
@@ -20,6 +21,7 @@ router.register(r'onboarding-templates', OnboardingTemplateViewSet)
 router.register(r'onboarding-task-templates', OnboardingTaskTemplateViewSet)
 router.register(r'onboardings', OnboardingViewSet)
 router.register(r'onboarding-tasks', OnboardingTaskInstanceViewSet) # Będzie pod /api/onboarding-tasks/
+router.register(r'user-badges', UserBadgeViewSet, basename='user-badge')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

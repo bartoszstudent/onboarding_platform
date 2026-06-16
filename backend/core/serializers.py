@@ -10,7 +10,7 @@ from .models import UserCompany, Company, CourseAssignment, OnboardingTemplate, 
     OnboardingTaskTemplate, Onboarding, \
     OnboardingTaskInstance, Quiz, MentorRating
 from .models.competencies import Competency, CompetencyCourse
-from .models import Badge, Question, Answer
+from .models import Badge, Question, Answer, UserBadge
 
 # ============================================================================
 # BLOCK SERIALIZERS
@@ -286,10 +286,20 @@ class QuizDetailSerializer(serializers.ModelSerializer):
 
 class BadgeSerializer(serializers.ModelSerializer):
     """Serializer for Badge model"""
+    xpReward = serializers.IntegerField(source='xp_reward', read_only=True)
     
     class Meta:
         model = Badge
-        fields = ['id', 'name', 'description', 'image']
+        fields = ['id', 'name', 'description', 'image', 'icon', 'category', 'rarity', 'xpReward']
+        read_only_fields = ['id']
+
+class UserBadgeSerializer(serializers.ModelSerializer):
+    """Serializer for manual badge assignment"""
+    badge_details = BadgeSerializer(source='badge', read_only=True)
+    
+    class Meta:
+        model = UserBadge
+        fields = ['id', 'user', 'badge', 'badge_details']
         read_only_fields = ['id']
 
 
