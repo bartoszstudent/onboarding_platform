@@ -5,7 +5,7 @@ from .models.training import Course, CourseAssignment
 from .models.section import Section
 from .models.block import Block
 from django.contrib.auth import get_user_model
-from .models.workspaces import Company
+from .models.workspaces import Company, UserRole
 from .models import UserCompany, Company, CourseAssignment, OnboardingTemplate, \
     OnboardingTaskTemplate, Onboarding, \
     OnboardingTaskInstance, Quiz, MentorRating
@@ -591,3 +591,88 @@ class MentorRatingSerializer(serializers.ModelSerializer):
 class MentorStatsSerializer(serializers.Serializer):
     average_rating = serializers.FloatField()
     total_ratings = serializers.IntegerField()
+
+class UserCompanyDetailSerializer(serializers.ModelSerializer):
+    """Szczegółowy serializer dla UserCompany - do GET, PUT"""
+    email = serializers.EmailField(source='user.email', read_only=True)
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    assigned_by_username = serializers.CharField(
+        source='assigned_by.username', 
+        read_only=True, 
+        allow_null=True
+    )
+    
+    class Meta:
+        model = UserCompany
+        fields = [
+            'id',
+            'user_id',
+            'email',
+            'first_name',
+            'last_name',
+            'role',
+            'assigned_at',
+            'assigned_by_username',
+        ]
+        read_only_fields = ['id', 'user_id', 'email', 'assigned_at', 'assigned_by_username']
+    
+    def validate_role(self, value):
+        """Walidacja czy rola jest dozwolona"""
+        allowed_roles = dict(UserRole.CHOICES)
+        if value not in allowed_roles:
+            raise serializers.ValidationError(
+                f"Niedozwolona rola. Dostępne: {', '.join(allowed_roles.keys())}"
+            )
+        return value
+
+
+class UserCompanyCreateSerializer(serializers.Serializer):
+    """Serializer do dodawania nowego użytkownika do firmy"""
+    email = serializers.EmailField()
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
+    role = serializers.ChoiceField(
+        choices=UserRole.CHOICES,
+        default=UserRole.EMPLOYEE
+    )
+    
+    def validate_email(self, value):
+        """Sprawdź czy email jest prawidłowy"""
+        if not value or '@' not in value:
+            raise serializers.ValidationError("Podaj prawidłowy email.")
+        return value.lower()
+    
+    def validate_role(self, value):
+        """Sprawdź czy rola jest dostępna"""
+        allowed_roles = dict(UserRole.CHOICES)
+        if value not in allowed_roles:
+            raise serializers.ValidationError(
+                f"Niedozwolona rola. Dostępne: {', '.join(allowed_roles.keys())}"
+            )
+        return value
+
+
+class UserCompanyUpdateRoleSerializer(serializers.ModelSerializer):
+    """Serializer do zmiany tylko roli użytkownika"""
+    class Meta:
+        model = UserCompany
+        fields = ['role']
+    
+    def validate_role(self, value):
+        if value not in dict(UserRole.CHOICES):
+            raise serializers.ValidationError("Nieprawidłowa rola.")
+        return value
+
+
+class UserCompanyListSerializer(serializers.ModelSerializer):
+    """Do wyświetlania listy pracowników"""
+    email = serializers.EmailField(source='user.email')
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+    user_id = serializers.IntegerField(source='user.id')
+
+    class Meta:
+        model = UserCompany
+        fields = ['id', 'user_id', 'email', 'first_name', 'last_name', 'role']

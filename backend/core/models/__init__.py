@@ -1,5 +1,5 @@
 # --- Workspaces & Companies ---
-from .workspaces import Company, Workspace, Invitation, UserCompany
+from .workspaces import Company, Workspace, Invitation, UserCompany, UserRole
 
 # --- Training & Courses ---
 from .training import *
@@ -28,6 +28,8 @@ __all__ = [
     'Company',
     'Workspace',
     'Invitation',
+    'UserCompany',
+    'UserRole',
     'Course',
     'CourseAssignment',
     'Section',

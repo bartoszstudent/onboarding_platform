@@ -24,7 +24,18 @@ urlpatterns = [
     path('api/companies/<int:pk>/', get_company, name='api-get-company'),
     # The API URLs are now determined automatically by the router.
     path('api/', include(router.urls)),
-
+    
+    path('companies/<int:company_pk>/users/', CompanyUsersViewSet.as_view({
+        'get': 'list', 
+        'post': 'create'
+    }), name='company-users-list'),
+    
+    path('companies/<int:company_pk>/users/<int:pk>/', CompanyUsersViewSet.as_view({
+        'get': 'retrieve',
+        'put': 'update',
+        'patch': 'partial_update',
+        'delete': 'destroy'
+    }), name='company-users-detail'),
     # Custom URL for getting courses for a specific user
     path('api/users/<int:user_id>/courses/', UserAssignedCoursesViewSet.as_view({'get': 'list'}), name='user-courses'),
     path('api/quizzes/<int:pk>/', QuizDetailView.as_view(), name='quiz-detail'),

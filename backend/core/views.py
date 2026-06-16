@@ -43,7 +43,8 @@ from .serializers import (
     OnboardingTemplateSerializer,
     OnboardingTaskTemplateSerializer,
     OnboardingSerializer,
-    OnboardingTaskInstanceSerializer
+    OnboardingTaskInstanceSerializer,
+    UserRole
 )
 
 from .models import Badge
@@ -411,7 +412,6 @@ class CompanyManagementViewSet(viewsets.ModelViewSet):
 
     # 1. Zarządzanie ustawieniami firmy (PUT/PATCH obsługiwane przez domyślne metody ModelViewSet)
 
-
 class CompanyUsersViewSet(viewsets.ViewSet):
     # Zmieniamy na IsAuthenticated, aby każdy zalogowany mógł wywołać widok
     permission_classes = [permissions.IsAuthenticated]
@@ -511,6 +511,215 @@ class CourseViewSet(viewsets.ModelViewSet):
         from .serializers import SectionSerializer
         data = SectionSerializer(sections, many=True).data
         return Response({"course_id": course.id, "sections": data})
+
+from .models.workspaces import UserRole
+from .serializers import (
+    UserCompanyDetailSerializer,
+    UserCompanyCreateSerializer,
+    UserCompanyUpdateRoleSerializer
+)
+
+class CompanyUsersViewSet(viewsets.ViewSet):
+    """
+    Zarządzanie użytkownikami w firmie.
+    
+    Endpoints:
+    - GET /companies/{company_pk}/users/           → Lista pracowników
+    - POST /companies/{company_pk}/users/          → Dodaj pracownika
+    - GET /companies/{company_pk}/users/{id}/      → Szczegóły pracownika
+    - PUT /companies/{company_pk}/users/{id}/      → Zmień rolę pracownika
+    - DELETE /companies/{company_pk}/users/{id}/   → Usuń pracownika z firmy
+    """
+    
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        """Różne permissje dla różnych akcji"""
+        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            return [permissions.IsAuthenticated(), IsCompanyAdmin()]
+        return [permissions.IsAuthenticated()]
+
+    def list(self, request, company_pk=None):
+        """
+        GET /companies/{company_pk}/users/
+        Pobierz listę wszystkich użytkowników w firmie.
+        """
+        # Sprawdzenie czy user należy do tej firmy
+        try:
+            user_company = UserCompany.objects.get(
+                user=request.user, 
+                company_id=company_pk
+            )
+        except UserCompany.DoesNotExist:
+            return Response(
+                {"detail": "Nie należysz do tej firmy."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Pobierz wszystkich użytkowników z firmy
+        queryset = UserCompany.objects.filter(
+            company_id=company_pk
+        ).select_related('user', 'assigned_by')
+        
+        serializer = UserCompanyDetailSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, company_pk=None, pk=None):
+        """
+        GET /companies/{company_pk}/users/{id}/
+        Pobierz szczegóły konkretnego użytkownika.
+        """
+        try:
+            user_company = UserCompany.objects.get(
+                id=pk,
+                company_id=company_pk
+            )
+        except UserCompany.DoesNotExist:
+            return Response(
+                {"detail": "Użytkownik nie znaleziony."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = UserCompanyDetailSerializer(user_company)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def create(self, request, company_pk=None):
+        """
+        POST /companies/{company_pk}/users/
+        Dodaj nowego użytkownika do firmy.
+        
+        Body:
+        {
+          "email": "jan@example.com",
+          "first_name": "Jan",
+          "last_name": "Kowalski",
+          "role": "employee"  // lub "mentor", "hr", "admin"
+        }
+        """
+        serializer = UserCompanyCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        email = serializer.validated_data['email']
+        first_name = serializer.validated_data.get('first_name', '')
+        last_name = serializer.validated_data.get('last_name', '')
+        role = serializer.validated_data['role']
+        
+        try:
+            company = Company.objects.get(pk=company_pk)
+        except Company.DoesNotExist:
+            return Response(
+                {"detail": "Firma nie znaleziona."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Sprawdź czy użytkownik już istnieje
+        try:
+            user = User.objects.get(email__iexact=email)
+            # Użytkownik istnieje - sprawdź czy już należy do tej firmy
+            if UserCompany.objects.filter(user=user, company=company).exists():
+                return Response(
+                    {"detail": "Użytkownik już należy do tej firmy."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except User.DoesNotExist:
+            # Stwórz nowego użytkownika
+            username = email.split('@')[0]
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                password=User.objects.make_random_password()  # Tymczasowe hasło
+            )
+        
+        # Utwórz relację UserCompany
+        user_company, created = UserCompany.objects.get_or_create(
+            user=user,
+            company=company,
+            defaults={
+                'role': role,
+                'assigned_by': request.user
+            }
+        )
+        
+        if not created:
+            return Response(
+                {"detail": "Użytkownik już należy do firmy."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        return Response(
+            UserCompanyDetailSerializer(user_company).data, 
+            status=status.HTTP_201_CREATED
+        )
+
+    def update(self, request, company_pk=None, pk=None):
+        """
+        PUT /companies/{company_pk}/users/{id}/
+        Aktualizuj rolę użytkownika.
+        
+        Body:
+        {
+          "role": "mentor"
+        }
+        """
+        try:
+            user_company = UserCompany.objects.get(
+                id=pk,
+                company_id=company_pk
+            )
+        except UserCompany.DoesNotExist:
+            return Response(
+                {"detail": "Użytkownik nie znaleziony."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = UserCompanyUpdateRoleSerializer(
+            user_company, 
+            data=request.data,
+            partial=False
+        )
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                UserCompanyDetailSerializer(user_company).data,
+                status=status.HTTP_200_OK
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def partial_update(self, request, company_pk=None, pk=None):
+        """
+        PATCH /companies/{company_pk}/users/{id}/
+        Częściowa aktualizacja roli.
+        """
+        return self.update(request, company_pk, pk)
+
+    def destroy(self, request, company_pk=None, pk=None):
+        """
+        DELETE /companies/{company_pk}/users/{id}/
+        Usuń użytkownika z firmy (usuń relację UserCompany).
+        """
+        try:
+            user_company = UserCompany.objects.get(
+                id=pk,
+                company_id=company_pk
+            )
+        except UserCompany.DoesNotExist:
+            return Response(
+                {"detail": "Użytkownik nie znaleziony."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        user_email = user_company.user.email
+        user_company.delete()
+        
+        return Response(
+            {"detail": f"Użytkownik {user_email} został usunięty z firmy."},
+            status=status.HTTP_200_OK
+        )
 
 class CompanyCourseViewSet(viewsets.ViewSet):
     """
