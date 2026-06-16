@@ -9,6 +9,8 @@ import '../../../data/services/auth_service.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/services/badge_service.dart';
 import '../../../data/models/badge_model.dart';
+import '../../../data/services/mentor_service.dart';
+import '../../../data/models/mentor_model.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -532,45 +534,93 @@ class BadgeWidget extends StatelessWidget {
 // Mentor z racji integracji w następnym punkcie pozostaje nienaruszony
 class MentorCardWidget extends StatelessWidget {
   const MentorCardWidget({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(color: Tokens.surface, borderRadius: BorderRadius.circular(Tokens.radius2xl), border: Border.all(color: Tokens.gray200)),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: const [Icon(Icons.school, color: Tokens.blue), SizedBox(width: 8), Text('Twój mentor', style: TextStyle(fontWeight: FontWeight.w600, color: Tokens.textDark))]),
-          const SizedBox(height: 16),
-          Row(
+    return FutureBuilder<List<MentorModel>>(
+      future: MentorService.fetchMentors(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        final mentors = snapshot.data ?? [];
+        if (mentors.isEmpty) {
+          return const SizedBox(); // Nie pokazujemy karty, jeśli w firmie nie ma innych pracowników
+        }
+        
+        // Wybieramy pierwszego pracownika jako mentora (na potrzeby widoku)
+        final mentor = mentors.first;
+        final initials = mentor.name.split(' ').map((n) => n.isNotEmpty ? n[0] : '').take(2).join('');
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Tokens.surface, 
+            borderRadius: BorderRadius.circular(Tokens.radius2xl), 
+            border: Border.all(color: Tokens.gray200)
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(radius: 28, backgroundColor: Tokens.blue.withOpacity(0.1), child: const Text('PW', style: TextStyle(color: Tokens.blue, fontWeight: FontWeight.bold, fontSize: 20))),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Piotr Wiśniewski', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Tokens.textDark)),
-                    const SizedBox(height: 4),
-                    const Text('Senior Frontend Developer', style: TextStyle(fontSize: 13, color: Tokens.textMuted2)),
-                    const SizedBox(height: 6),
-                  ],
+              Row(
+                children: const [
+                  Icon(Icons.school, color: Tokens.blue), 
+                  SizedBox(width: 8), 
+                  Text('Twój mentor', style: TextStyle(fontWeight: FontWeight.w600, color: Tokens.textDark))
+                ]
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28, 
+                    backgroundColor: Tokens.blue.withOpacity(0.1), 
+                    child: Text(initials.toUpperCase(), style: const TextStyle(color: Tokens.blue, fontWeight: FontWeight.bold, fontSize: 20))
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(mentor.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Tokens.textDark)),
+                        const SizedBox(height: 4),
+                        Text(mentor.role, style: const TextStyle(fontSize: 13, color: Tokens.textMuted2)),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.star, color: Colors.amber, size: 14),
+                            const SizedBox(width: 4),
+                            Text('${mentor.rating}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                            Text(' (${mentor.reviewCount} opinii)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    // Przekazujemy prawdziwe ID oraz Name jako parametry URL do widoku
+                    context.go('/mentor-rating?mentorId=${mentor.id}&mentorName=${Uri.encodeComponent(mentor.name)}&taskTitle=Współpraca wdrażeniowa');
+                  },
+                  icon: const Icon(Icons.rate_review_outlined, size: 16),
+                  label: const Text('Oceń współpracę'),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Tokens.blue), 
+                    foregroundColor: Tokens.blue, 
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => context.go('/mentor-rating?mentorName=Piotr Wiśniewski&taskTitle=Współpraca wdrażeniowa'),
-              icon: const Icon(Icons.rate_review_outlined, size: 16),
-              label: const Text('Oceń współpracę'),
-              style: OutlinedButton.styleFrom(side: const BorderSide(color: Tokens.blue), foregroundColor: Tokens.blue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-            ),
-          ),
-        ],
-      ),
+        );
+      }
     );
   }
 }

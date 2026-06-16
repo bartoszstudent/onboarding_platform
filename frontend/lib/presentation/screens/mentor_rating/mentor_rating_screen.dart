@@ -6,12 +6,14 @@ import '../../../data/services/mentor_service.dart';
 class MentorRatingScreen extends StatefulWidget {
   final String? taskTitle;
   final String mentorName;
+  final String mentorId; // DODANE POLE
   final VoidCallback onBack;
 
   const MentorRatingScreen({
     super.key,
     this.taskTitle,
-    this.mentorName = 'Piotr Wiśniewski',
+    this.mentorName = 'Nieznany Mentor',
+    this.mentorId = '1', // Wartość domyślna, by nie zepsuć kompilacji w routerze
     required this.onBack,
   });
 
@@ -94,7 +96,7 @@ class _MentorRatingScreenState extends State<MentorRatingScreen> {
 
     try {
       final success = await MentorService.submitRating(
-        mentorId: '1', // Default simulation ID
+        mentorId: widget.mentorId, // Default simulation ID
         rating: _overallRating,
         comment: _commentController.text,
         criteriaRatings: _criteriaRatings,
