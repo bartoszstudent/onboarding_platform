@@ -53,6 +53,11 @@ from . import serializers
 from .models import UserBadge
 from .serializers import UserBadgeSerializer
 from .models import CourseAssignment, UserBadge
+import datetime
+from django.db.models import Sum
+from rest_framework.views import APIView
+from .models import XPTransaction, Milestone
+from .serializers import XPTransactionSerializer, MilestoneSerializer
 User = get_user_model()
 
 # ile sekund ważny jest token (tu: 7 dni)
@@ -365,6 +370,16 @@ class SubmitQuizView(views.APIView):
         ).count()
         
         score = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
+
+        if score >= 80:
+            # Blokada przed wielokrotnym zdobywaniem punktów za ten sam quiz
+            quiz_reason = f"Zaliczony quiz ID: {pk}"
+            if not XPTransaction.objects.filter(user=request.user, reason=quiz_reason).exists():
+                XPTransaction.objects.create(
+                    user=request.user,
+                    amount=250,
+                    reason=quiz_reason
+                )
 
         # Requirement 4: Show end-score
         return Response({
@@ -809,3 +824,50 @@ class DashboardView(APIView):
                 },
                 "activities": [] # Puste dla pracownika
             }, status=status.HTTP_200_OK)
+        
+class GamificationAnalyticsView(APIView):
+    """Endpoint agregujący pełne statystyki profilu grywalizacyjnego pracownika."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        
+        # 1. Łączny dorobek punktowy
+        total_xp = XPTransaction.objects.filter(user=user).aggregate(Sum('amount'))['amount__sum'] or 0
+
+        # 2. Rozkład tygodniowy (Pn - Nd) dla bieżącego tygodnia
+        now = timezone.now()
+        start_of_week = now - datetime.timedelta(days=now.weekday())
+        start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        weekly_xp = [0] * 7
+        transactions_this_week = XPTransaction.objects.filter(user=user, created_at__gte=start_of_week)
+        for t in transactions_this_week:
+            # t.created_at.weekday() zwraca 0 dla Pn, 6 dla Nd
+            weekly_xp[t.created_at.weekday()] += t.amount
+
+        # 3. Ostatnie aktywności użytkownika
+        recent = XPTransaction.objects.filter(user=user).order_by('-created_at')[:5]
+        recent_serializer = XPTransactionSerializer(recent, many=True)
+
+        # 4. Lista kamieni milowych z bazy (jeśli pusta, zwracamy domyślne)
+        milestones = Milestone.objects.order_by('level')
+        if not milestones.exists():
+            # Automatyczne uzupełnienie podstawowych progów w bazie przy pierwszym wywołaniu
+            Milestone.objects.bulk_create([
+                Milestone(level=1, title="Nowicjusz", required_xp=0),
+                Milestone(level=2, title="Uczeń", required_xp=250),
+                Milestone(level=3, title="Praktykant", required_xp=750),
+                Milestone(level=4, title="Junior", required_xp=1500),
+                Milestone(level=5, title="Mid", required_xp=3000),
+            ])
+            milestones = Milestone.objects.order_by('level')
+
+        milestones_serializer = MilestoneSerializer(milestones, many=True)
+
+        return Response({
+            "total_xp": total_xp,
+            "weekly_xp": weekly_xp,
+            "recent_activities": recent_serializer.data,
+            "milestones": milestones_serializer.data
+        }, status=status.HTTP_200_OK)

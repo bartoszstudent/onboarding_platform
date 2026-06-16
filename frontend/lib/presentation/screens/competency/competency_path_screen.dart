@@ -62,7 +62,28 @@ class _CompetencyPathScreenState extends State<CompetencyPathScreen> {
               );
             }
 
+            // 1. ZADEKLAROWANIE ZMIENNEJ
             final paths = snapshot.data ?? [];
+
+            // 2. DOPIERO TERAZ SPRAWDZENIE, CZY JEST PUSTA
+            if (paths.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.all(32.0),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.route, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text(
+                        'HR nie zdefiniował jeszcze żadnych ścieżek kompetencji.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
 
             final earnedXp =
               paths.fold<int>(0, (sum, p) => sum + p.earnedXp);

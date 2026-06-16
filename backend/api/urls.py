@@ -9,6 +9,7 @@ from core.views import BadgeViewSet
 from core.views import SectionProgressView
 from core.views import UserBadgeViewSet
 from core.views import DashboardView 
+from core.views import GamificationAnalyticsView
 
 # Create a router and register our viewsets with it.
 router = DefaultRouter()
@@ -54,4 +55,5 @@ urlpatterns = [
 
     path('api/section-progress/', SectionProgressView.as_view(), name='section-progress'),
     path('api/dashboard/', DashboardView.as_view(), name='api-dashboard'),
+    path('api/gamification/analytics/', GamificationAnalyticsView.as_view(), name='gamification-analytics'),
 ]

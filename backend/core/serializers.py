@@ -11,6 +11,7 @@ from .models import UserCompany, Company, CourseAssignment, OnboardingTemplate, 
     OnboardingTaskInstance, Quiz, MentorRating
 from .models.competencies import Competency, CompetencyCourse
 from .models import Badge, Question, Answer, UserBadge
+from .models import XPTransaction, Milestone
 
 # ============================================================================
 # BLOCK SERIALIZERS
@@ -613,3 +614,26 @@ class MentorRatingSerializer(serializers.ModelSerializer):
 class MentorStatsSerializer(serializers.Serializer):
     average_rating = serializers.FloatField()
     total_ratings = serializers.IntegerField()
+
+class XPTransactionSerializer(serializers.ModelSerializer):
+    time_ago = serializers.SerializerMethodField()
+
+    class Meta:
+        model = XPTransaction
+        fields = ['id', 'amount', 'reason', 'time_ago']
+
+    def get_time_ago(self, obj):
+        now = timezone.now()
+        diff = now - obj.created_at
+        if diff.days == 0:
+            hours = diff.seconds // 3600
+            if hours == 0:
+                return "Przed chwilą"
+            return f"{hours}h temu"
+        return f"{diff.days}d temu"
+
+
+class MilestoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Milestone
+        fields = ['level', 'title', 'required_xp']
