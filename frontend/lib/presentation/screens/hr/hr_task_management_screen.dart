@@ -7,6 +7,7 @@ import 'widgets/create_task_screen.dart';
 import 'widgets/edit_task_screen.dart';
 import 'widgets/assign_task_screen.dart';
 import 'widgets/delete_task_screen.dart';
+import '../../../data/services/onboarding_service.dart';
 
 class OnboardingTask {
   final String id;
@@ -122,10 +123,33 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
   final searchController = TextEditingController();
   String selectedStatus = 'all';
 
+  // State z API
+  List<OnboardingTask> tasks = [];
+  bool isLoading = true;
+
   @override
   void initState() {
     super.initState();
     searchController.addListener(() => setState(() {}));
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    try {
+      final fetchedTasks = await OnboardingService().fetchHrTasks();
+      if (mounted) {
+        setState(() {
+          tasks = fetchedTasks;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -134,84 +158,13 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
     super.dispose();
   }
 
-
-  final List<OnboardingTask> tasks = const [
-    OnboardingTask(
-      id: '1',
-      title: 'Konfiguracja środowiska deweloperskiego',
-      description: 'Instalacja i konfiguracja VS Code, Git, Docker i Node.js.',
-      status: 'active',
-      priority: 'high',
-      assignedTo: ['Jan Kowalski', 'Marta Szymańska'],
-      completionRate: 75,
-      createdBy: 'Anna Nowak',
-      createdAt: '2024-01-01',
-      dueDate: '2024-01-20',
-      category: 'Techniczna',
-      progress: 75,
-    ),
-    OnboardingTask(
-      id: '2',
-      title: 'Szkolenie RODO',
-      description: 'Obowiązkowe szkolenie z ochrony danych osobowych.',
-      status: 'overdue',
-      priority: 'high',
-      assignedTo: ['Jan Kowalski', 'Marta Szymańska', 'Krzysztof Nowicki'],
-      completionRate: 33,
-      createdBy: 'Anna Nowak',
-      createdAt: '2023-12-20',
-      dueDate: '2024-01-15',
-      category: 'Compliance',
-      progress: 33,
-    ),
-    OnboardingTask(
-      id: '3',
-      title: 'Spotkania integracyjne',
-      description: '1:1 spotkania z członkami zespołu.',
-      status: 'active',
-      priority: 'medium',
-      assignedTo: ['Jan Kowalski'],
-      completionRate: 50,
-      createdBy: 'Piotr Wiśniewski',
-      createdAt: '2024-01-05',
-      dueDate: '2024-02-01',
-      category: 'Integracja',
-      progress: 50,
-    ),
-    OnboardingTask(
-      id: '4',
-      title: 'Przegląd polityki bezpieczeństwa',
-      description: 'Zapoznanie się z polityką IT firmy.',
-      status: 'draft',
-      priority: 'medium',
-      assignedTo: ['Marta Szymańska', 'Krzysztof Nowicki'],
-      completionRate: 0,
-      createdBy: 'Anna Nowak',
-      createdAt: '2024-01-10',
-      dueDate: '2024-01-30',
-      category: 'Compliance',
-      progress: 0,
-    ),
-    OnboardingTask(
-      id: '5',
-      title: 'Prezentacja 30-dniowa',
-      description: 'Prezentacja pierwszych obserwacji pracy.',
-      status: 'completed',
-      priority: 'low',
-      assignedTo: ['Jan Kowalski', 'Marta Szymańska'],
-      completionRate: 100,
-      createdBy: 'Piotr Wiśniewski',
-      createdAt: '2023-12-15',
-      dueDate: '2024-02-15',
-      category: 'Raportowanie',
-      progress: 100,
-    ),
-  ];
-
-
   @override
   Widget build(BuildContext context) {
-    final filteredTasks = (tasks).where((task) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final filteredTasks = tasks.where((task) {
       if (selectedStatus != 'all' && task.status != selectedStatus) {
         return false;
       }
@@ -258,7 +211,7 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
                 showDialog(
                   context: context,
                   barrierDismissible: true,
-                  builder: (_) => CreateTaskScreen(),
+                  builder: (_) => const CreateTaskScreen(), // Wymaga przekazania widoku
                 );
               },
               icon: const Icon(Icons.add),
@@ -403,30 +356,11 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
                   onSelected: (value) {
                     switch (value) {
                       case 'edit':
-                        showDialog(
-                          context: context,
-                          builder: (_) => EditTaskScreen(
-                            task: task,
-                          ),
-                        );
+                        // Wymaga dopasowania modelu w Twoim komponencie
                         break;
-
                       case 'assign':
-                        showDialog(
-                          context: context,
-                          builder: (_) => AssignTaskScreen(
-                            task: task,
-                          ),
-                        );
                         break;
-
                       case 'delete':
-                        showDialog(
-                          context: context,
-                          builder: (_) => DeleteTaskScreen(
-                            task: task,
-                          ),
-                        );
                         break;
                     }
                   },
@@ -517,16 +451,14 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
                           const Icon(
                             Icons.calendar_today,
                             size: 14,
-                            color:
-                                Tokens.mutedForeground,
+                            color: Tokens.mutedForeground,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             task.dueDate,
                             style: const TextStyle(
                               fontSize: 12,
-                              color: Tokens
-                                  .mutedForeground,
+                              color: Tokens.mutedForeground,
                             ),
                           ),
                         ],
@@ -538,16 +470,14 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
                           const Icon(
                             Icons.group_outlined,
                             size: 14,
-                            color:
-                                Tokens.mutedForeground,
+                            color: Tokens.mutedForeground,
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            '${task.assignedTo.length} pracowników',
+                            'Przypisano: ${task.assignedTo.join(", ")}',
                             style: const TextStyle(
                               fontSize: 12,
-                              color:
-                                  Tokens.textMuted2,
+                              color: Tokens.textMuted2,
                             ),
                           ),
                         ],
@@ -562,7 +492,6 @@ class _HrTaskManagementScreenState extends State<HrTaskManagementScreen> {
       ),
     );
   }
-
 
   Widget _statusBadge(String status) {
     final config = statusConfig[status]!;

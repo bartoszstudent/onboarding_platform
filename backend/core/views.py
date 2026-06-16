@@ -47,7 +47,7 @@ from .serializers import (
 )
 
 from .models import Badge
-from .permissions import IsCompanyAdmin
+from .permissions import IsCompanyAdmin, IsCompanyAdminOrHR
 from .models.competencies import Competency
 from . import serializers
 from .models import UserBadge
@@ -420,10 +420,9 @@ class CompanyUsersViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
-        # Sprawdzamy metodę requestu zamiast self.action, 
-        # aby uniknąć błędów gdy action nie jest jeszcze ustawione
         if self.request.method in ['POST', 'DELETE']:
-            return [permissions.IsAuthenticated(), IsCompanyAdmin()]
+            # ZMIANA: Zastępujemy IsCompanyAdmin() nową klasą IsCompanyAdminOrHR()
+            return [permissions.IsAuthenticated(), IsCompanyAdminOrHR()]
         return [permissions.IsAuthenticated()]
 
     def list(self, request, company_pk=None):
@@ -520,7 +519,7 @@ class CompanyCourseViewSet(viewsets.ViewSet):
     Zarządzanie kursami w kontekście firmy.
     Ścieżka: /api/companies/{company_pk}/courses/
     """
-    permission_classes = [permissions.IsAuthenticated, IsCompanyAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsCompanyAdminOrHR]
 
     # GET: Lista kursów firmy
     def list(self, request, company_pk=None):
