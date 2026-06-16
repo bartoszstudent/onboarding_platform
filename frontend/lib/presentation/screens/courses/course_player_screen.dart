@@ -16,106 +16,92 @@ class CoursePlayerScreen extends StatefulWidget {
 }
 
 class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
-  int currentSection = 0;
-  bool _loading = true;
-  List<Question> _questions = [];
-  final Set<int> _answeredIndices = {};
+  // Przechowujemy Future, aby zapobiec ponownemu pobieraniu przy każdym rebuildzie
+  late Future<Quiz> _quizFuture;
 
   @override
   void initState() {
     super.initState();
-    _loadQuiz(); 
-  }
-
-  Future<void> _loadQuiz() async {
-    try {
-      final quizData = await QuizService.fetchQuizForCourse(widget.course.id);
-      setState(() {
-        _questions = quizData.questions;
-        _loading = false;
-      });
-    } catch (e) {
-      debugPrint('Błąd ładowania quizu: $e');
-      setState(() {
-        _loading = false;
-      });
-    }
+    // Odpalamy zapytanie do serwera podczas inicjalizacji ekranu
+    _quizFuture = QuizService.fetchQuizForCourse(widget.course.id);
   }
 
   @override
   Widget build(BuildContext context) {
-    final allAnswered = _answeredIndices.length == _questions.length && _questions.isNotEmpty;
-
     return Scaffold(
       appBar: AppBar(title: Text(widget.course.title)),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _questions.isEmpty
-              ? const Center(child: Text("Brak quizów w tym kursie."))
-              : Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: _questions.length,
-                          itemBuilder: (context, index) {
-                            final question = _questions[index];
-                            return QuizWidget(
-                              quiz: question.toJson(),
-                              onAnswered: (correct) {
-                                setState(() {
-                                  _answeredIndices.add(index);
-                                });
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                      if (allAnswered) ...[
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              const badge = BadgeModel(
-                                id: 'b_course_completed',
-                                name: 'Mistrz Wiedzy 🎓',
-                                description: 'Ukończono quiz i wykazano się wiedzą merytoryczną.',
-                                icon: 'trophy',
-                                category: 'Nauka',
-                                rarity: BadgeRarity.rare,
-                                xpReward: 150,
-                              );
-                              BadgeAwardDialog.show(
-                                context,
-                                badge,
-                                () {
-                                  context.go('/dashboard');
-                                },
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'Zakończ kurs i odbierz nagrodę 🏆',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+      body: FutureBuilder<Quiz>(
+        future: _quizFuture,
+        builder: (context, snapshot) {
+          // 1. Ładowanie
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // 2. Obsługa błędu (np. kod 404, gdy brak przypisanego quizu)
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Text(
+                  'Brak quizów w tym kursie lub wystąpił błąd:\n${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.black54),
                 ),
+              ),
+            );
+          }
+
+          // 3. Sprawdzenie czy quiz ma jakieś pytania
+          if (!snapshot.hasData || snapshot.data!.questions.isEmpty) {
+            return const Center(child: Text("Ten quiz nie ma jeszcze żadnych pytań."));
+          }
+
+          final quiz = snapshot.data!;
+
+          // 4. Renderowanie pojedynczego QuizWidget (który sam wyświetli wszystkie pytania)
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: QuizWidget(
+              quiz: quiz,
+              onCompleted: (QuizResult result) {
+                // Ta funkcja odpali się po wciśnięciu "Prześlij odpowiedzi" 
+                // i zwróceniu wyniku z serwera Django.
+                
+                // Ustawiamy próg zaliczenia na np. 80%
+                if (result.score >= 80.0) { 
+                  const badge = BadgeModel(
+                    id: 'b_course_completed',
+                    name: 'Mistrz Wiedzy 🎓',
+                    description: 'Ukończono quiz i wykazano się wiedzą merytoryczną.',
+                    icon: 'trophy',
+                    category: 'Nauka',
+                    rarity: BadgeRarity.rare,
+                    xpReward: 150,
+                  );
+                  
+                  // Pokaż modal z nagrodą
+                  BadgeAwardDialog.show(
+                    context,
+                    badge,
+                    () {
+                      // Po zamknięciu dialogu wróć do dashboardu
+                      context.go('/dashboard');
+                    },
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Aby zaliczyć kurs i zdobyć odznakę, musisz zdobyć co najmniej 80%.'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              },
+            ),
+          );
+        },
+      ),
     );
   }
 }
