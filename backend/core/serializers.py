@@ -507,10 +507,22 @@ class OnboardingTemplateSerializer(serializers.ModelSerializer):
 # ==========================================
 
 class OnboardingTaskInstanceSerializer(serializers.ModelSerializer):
+    # Wyciągamy pola z szablonu, aby zminimalizować zmiany na frontendzie
+    title = serializers.CharField(source='template_task.title', read_only=True)
+    description = serializers.CharField(source='template_task.description', read_only=True)
+    category = serializers.CharField(source='template_task.category', read_only=True)
+    priority = serializers.CharField(source='template_task.priority', read_only=True)
+    
+    # Opcjonalnie: możemy też zwrócić czytelne imiona
+    assignee_name = serializers.CharField(source='assigned_to_user.first_name', read_only=True)
+    mentor_name = serializers.CharField(source='mentor_user.first_name', read_only=True)
+
     class Meta:
         model = OnboardingTaskInstance
-        fields = ['id', 'onboarding', 'template_task', 'assigned_to_user', 'assigned_by_user', 'mentor_user', 'status']
-        read_only_fields = ['assigned_by_user']
+        fields = [
+            'id', 'status', 'title', 'description', 'category', 'priority', 
+            'due_date', 'completed_date', 'progress', 'assignee_name', 'mentor_name'
+        ]
 
     def validate(self, data):
         """
