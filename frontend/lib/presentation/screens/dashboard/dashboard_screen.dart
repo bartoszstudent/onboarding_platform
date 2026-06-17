@@ -22,7 +22,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<DashboardStats> _statsFuture;
   late Future<List<ActivityItem>> _activitiesFuture;
-
+  late Future<List<double>> _chartDataFuture; 
   String? _role;
   UserModel? _user;
   bool _loadingUser = true;
@@ -31,6 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _statsFuture = DashboardService.getStats();
+    _chartDataFuture = DashboardService.getWeeklyActivity(); 
     _activitiesFuture = DashboardService.getRecentActivities(limit: 10);
     _loadUser();
   }
@@ -165,14 +166,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 20),
 
-          // Wykres i akcje na razie pozostają statyczne
+          // Wykres i akcje zintegrowane z API
           LayoutBuilder(builder: (context, constraints) {
             final width = constraints.maxWidth;
             final leftWidth = width >= 1000 ? width * 0.68 : width;
             final rightWidth = width >= 1000 ? width * 0.3 : width;
+            
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // === LEWA STRONA (WYKRES) ===
                 SizedBox(
                   width: leftWidth,
                   child: Container(
@@ -188,34 +191,68 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           children: [
                             SvgPicture.asset('assets/icons/chart-bar.svg', width: 18, height: 18, color: Tokens.blue),
                             const SizedBox(width: 8),
-                            const Text('Aktywność (Wykres pokazowy)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                            const Text('Tygodniowa aktywność platformy', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                           ],
                         ),
                         const SizedBox(height: 12),
-                        SizedBox(
-                          height: 200,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: List.generate(7, (i) {
-                              final heights = [0.45, 0.55, 0.6, 0.58, 0.72, 0.4, 0.35];
-                              return Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                                  child: Container(
-                                    height: 200 * heights[i],
-                                    decoration: BoxDecoration(color: Tokens.blue, borderRadius: BorderRadius.circular(6)),
-                                  ),
-                                ),
+                        
+                        FutureBuilder<List<double>>(
+                          future: _chartDataFuture,
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return const SizedBox(
+                                height: 200, 
+                                child: Center(child: CircularProgressIndicator())
                               );
-                            }),
-                          ),
-                        )
+                            }
+                            
+                            final heights = snapshot.data ?? List.generate(7, (index) => 0.05);
+
+                            return SizedBox(
+                              height: 200,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: List.generate(7, (i) {
+                                  final days = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
+                                  return Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                          AnimatedContainer(
+                                            duration: const Duration(milliseconds: 600),
+                                            curve: Curves.easeOut,
+                                            height: 180 * heights[i],
+                                            decoration: BoxDecoration(
+                                              color: Tokens.blue, 
+                                              borderRadius: BorderRadius.circular(6)
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            days[i], 
+                                            style: const TextStyle(fontSize: 10, color: Colors.grey)
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ),
+                            );
+                          }
+                        ), // <- Koniec FutureBuildera
                       ],
                     ),
                   ),
-                ),
+                ), // <- Koniec lewej kolumny (SizedBox)
+                
+                // === ODSTĘP ===
                 if (width >= 1000) const SizedBox(width: 20),
+                
+                // === PRAWA STRONA (SZYBKIE AKCJE) ===
                 SizedBox(
                   width: rightWidth,
                   child: Container(
@@ -236,7 +273,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
                     ),
                   ),
-                )
+                ) // <- Koniec prawej kolumny (SizedBox)
               ],
             );
           }),
