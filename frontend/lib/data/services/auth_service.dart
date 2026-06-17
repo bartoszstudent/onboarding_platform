@@ -71,6 +71,12 @@ class AuthService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_userKey, jsonEncode(user.toJson()));
 
+      if (companyMap != null && companyMap['name'] != null) {
+        await prefs.setString('company_name', companyMap['name']);
+      } else {
+        await prefs.setString('company_name', 'Brak przypisanej firmy');
+      }
+
       AuthState.instance.notify();
 
       return true;
@@ -124,5 +130,14 @@ class AuthService {
     await prefs.remove(_userKey);
 
     AuthState.instance.notify();
+  }
+  /// Pobiera zapisaną nazwę firmy z pamięci urządzenia
+  static Future<String?> getCompanyName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('company_name');
+    } catch (e) {
+      throw Exception('Błąd odczytu nazwy firmy: $e');
+    }
   }
 }

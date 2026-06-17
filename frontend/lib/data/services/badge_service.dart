@@ -1,155 +1,97 @@
-import 'dart:async';
+import 'dart:convert';
 import '../models/badge_model.dart';
+import 'api_client.dart';
+import 'auth_service.dart';
+import '../../core/utils/token_manager.dart';
 
 class BadgeService {
-  static final List<BadgeModel> _mockBadges = [
-    const BadgeModel(
-      id: 'b1',
-      name: 'Szybki Start',
-      description: 'Ukończono onboarding przed terminem.',
-      icon: 'zap',
-      category: 'Onboarding',
-      rarity: BadgeRarity.common,
-      xpReward: 100,
-    ),
-    const BadgeModel(
-      id: 'b2',
-      name: 'Team Player',
-      description: 'Aktywnie wspierał kolegów z zespołu.',
-      icon: 'medal',
-      category: 'Współpraca',
-      rarity: BadgeRarity.common,
-      xpReward: 150,
-    ),
-    const BadgeModel(
-      id: 'b3',
-      name: 'Mentor Buddy',
-      description: 'Wyjątkowo zaangażowany mentor.',
-      icon: 'trophy',
-      category: 'Mentoring',
-      rarity: BadgeRarity.rare,
-      xpReward: 300,
-    ),
-    const BadgeModel(
-      id: 'b4',
-      name: 'Code Master',
-      description: 'Wyjątkowa jakość kodu i architektury.',
-      icon: 'target',
-      category: 'Techniczna',
-      rarity: BadgeRarity.rare,
-      xpReward: 250,
-    ),
-    const BadgeModel(
-      id: 'b5',
-      name: 'Komunikator',
-      description: 'Wzorowa komunikacja w zespole.',
-      icon: 'star',
-      category: 'Miękkie',
-      rarity: BadgeRarity.common,
-      xpReward: 100,
-    ),
-    const BadgeModel(
-      id: 'b6',
-      name: 'Innowator',
-      description: 'Zaproponował innowacyjne rozwiązanie.',
-      icon: 'flame',
-      category: 'Kreatywność',
-      rarity: BadgeRarity.epic,
-      xpReward: 500,
-    ),
-    const BadgeModel(
-      id: 'b7',
-      name: 'Compliance Pro',
-      description: 'Wzorowe przestrzeganie procedur.',
-      icon: 'medal',
-      category: 'Compliance',
-      rarity: BadgeRarity.common,
-      xpReward: 150,
-    ),
-    const BadgeModel(
-      id: 'b8',
-      name: 'Legenda Onboardingu',
-      description: 'Perfekcyjnie ukończony cały program onboardingowy.',
-      icon: 'crown',
-      category: 'Onboarding',
-      rarity: BadgeRarity.legendary,
-      xpReward: 1000,
-    ),
-  ];
-
-  static final List<EmployeeModel> _mockEmployees = [
-    const EmployeeModel(
-      id: 'e1',
-      name: 'Jan Kowalski',
-      role: 'Frontend Developer',
-      department: 'Engineering',
-      badges: ['b1', 'b2'],
-    ),
-    const EmployeeModel(
-      id: 'e2',
-      name: 'Marta Szymańska',
-      role: 'UX Designer',
-      department: 'Design',
-      badges: ['b5'],
-    ),
-    const EmployeeModel(
-      id: 'e3',
-      name: 'Krzysztof Nowicki',
-      role: 'Backend Developer',
-      department: 'Engineering',
-      badges: [],
-    ),
-    const EmployeeModel(
-      id: 'e4',
-      name: 'Agata Wiśniewska',
-      role: 'QA Engineer',
-      department: 'QA',
-      badges: ['b1', 'b7'],
-    ),
-  ];
-
+  
+  /// 1. Pobieranie wszystkich dostępnych w systemie odznak z /api/badges/
   static Future<List<BadgeModel>> fetchAllBadges() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return List.from(_mockBadges);
+    final token = await TokenManager.getToken();
+    final response = await ApiClient.get(
+      'api/badges/',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+      return data.map((json) => BadgeModel.fromJson(json)).toList();
+    } else {
+      throw Exception('Nie udało się pobrać konfiguracji odznak z serwera');
+    }
   }
 
-  static Future<List<EmployeeModel>> fetchEmployees() async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    return List.from(_mockEmployees);
-  }
+  /// 2. Pobieranie pracowników należących do firmy z /companies/{id}/users/
+ static Future<List<EmployeeModel>> fetchEmployees() async {
+    final token = await TokenManager.getToken();
+    final currentUser = await AuthService.getCurrentUser();
 
+    // ZMIANA TUTAJ: używamy currentUser.companyId zamiast currentUser.company
+    if (currentUser == null || currentUser.companyId == null) {
+      throw Exception('Brak przypisanej firmy lub niezalogowany użytkownik.');
+    }
+
+    // Pobieramy ID firmy bezpośrednio z właściwości companyId
+    final companyId = currentUser.companyId!;
+    
+    final response = await ApiClient.get(
+      'companies/$companyId/users/',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+      return data.map((json) {
+        return EmployeeModel(
+          id: json['user_id'].toString(),
+          name: '${json['first_name']} ${json['last_name']}'.trim(),
+          role: json['role'] ?? 'Pracownik',
+          department: 'Firma', 
+          badges: [], // Puste, póki nie zaciągniemy odznak dla każdego pojedynczo
+        );
+      }).toList();
+    } else {
+      throw Exception('Brak dostępu do pobierania listy pracowników.');
+    }
+  }
+  /// 3. Ręczne przypisanie odznaki strzałem POST na /api/user-badges/
   static Future<bool> awardBadge(
     String employeeId,
     String badgeId,
     String? message,
   ) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final idx = _mockEmployees.indexWhere((e) => e.id == employeeId);
-    if (idx != -1) {
-      final old = _mockEmployees[idx];
-      if (!old.badges.contains(badgeId)) {
-        _mockEmployees[idx] = EmployeeModel(
-          id: old.id,
-          name: old.name,
-          role: old.role,
-          department: old.department,
-          badges: [...old.badges, badgeId],
-          avatar: old.avatar,
-        );
-      }
-    }
-    return true;
+    final token = await TokenManager.getToken();
+    final response = await ApiClient.post(
+      'api/user-badges/',
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'user': int.parse(employeeId),
+        'badge': int.parse(badgeId),
+        // Uwaga: 'message' nie jest jeszcze obsługiwane w UserBadgeModel, 
+        // ale wysyłamy go bezpiecznie z frontu w razie przyszłej integracji
+      }),
+    );
+
+    return response.statusCode == 201 || response.statusCode == 200;
   }
 
+  /// 4. Pobieranie odznak przypisanych do konkretnego usera
   static Future<List<BadgeModel>> fetchUserBadges(String userId) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    // Simulating user e1 is Jan Kowalski
-    final employee = _mockEmployees.firstWhere(
-      (e) => e.id == userId || e.name.contains(userId),
-      orElse: () => _mockEmployees.first,
+    final token = await TokenManager.getToken();
+    final response = await ApiClient.get(
+      'api/user-badges/?user_id=$userId',
+      headers: {'Authorization': 'Bearer $token'},
     );
-    return _mockBadges
-        .where((badge) => employee.badges.contains(badge.id))
-        .toList();
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+      // Z backendu dostajemy obiekt w polu badge_details nałożony przez serializer
+      return data.map((json) => BadgeModel.fromJson(json['badge_details'])).toList();
+    }
+    return [];
   }
 }

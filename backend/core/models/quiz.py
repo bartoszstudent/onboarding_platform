@@ -5,6 +5,7 @@ class Quiz(models.Model):
     # REMOVED: section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name='quizzes')
     title = models.CharField(max_length=255)
     # REMOVED: order = models.PositiveIntegerField(default=0)
+    passing_score = models.PositiveIntegerField(default=80)
     
     # You can add other fields here later, like a description.
 

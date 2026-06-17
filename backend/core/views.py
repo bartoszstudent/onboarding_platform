@@ -47,9 +47,17 @@ from .serializers import (
 )
 
 from .models import Badge
-from .permissions import IsCompanyAdmin
+from .permissions import IsCompanyAdmin, IsCompanyAdminOrHR
 from .models.competencies import Competency
 from . import serializers
+from .models import UserBadge
+from .serializers import UserBadgeSerializer
+from .models import CourseAssignment, UserBadge
+import datetime
+from django.db.models import Sum
+from rest_framework.views import APIView
+from .models import XPTransaction, Milestone
+from .serializers import XPTransactionSerializer, MilestoneSerializer
 User = get_user_model()
 
 # ile sekund ważny jest token (tu: 7 dni)
@@ -363,6 +371,16 @@ class SubmitQuizView(views.APIView):
         
         score = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
 
+        if score >= 80:
+            # Blokada przed wielokrotnym zdobywaniem punktów za ten sam quiz
+            quiz_reason = f"Zaliczony quiz ID: {pk}"
+            if not XPTransaction.objects.filter(user=request.user, reason=quiz_reason).exists():
+                XPTransaction.objects.create(
+                    user=request.user,
+                    amount=250,
+                    reason=quiz_reason
+                )
+
         # Requirement 4: Show end-score
         return Response({
             "quiz_id": quiz.id,
@@ -417,10 +435,9 @@ class CompanyUsersViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
-        # Sprawdzamy metodę requestu zamiast self.action, 
-        # aby uniknąć błędów gdy action nie jest jeszcze ustawione
         if self.request.method in ['POST', 'DELETE']:
-            return [permissions.IsAuthenticated(), IsCompanyAdmin()]
+            # ZMIANA: Zastępujemy IsCompanyAdmin() nową klasą IsCompanyAdminOrHR()
+            return [permissions.IsAuthenticated(), IsCompanyAdminOrHR()]
         return [permissions.IsAuthenticated()]
 
     def list(self, request, company_pk=None):
@@ -494,8 +511,11 @@ class CourseViewSet(viewsets.ModelViewSet):
             workspace = user_company.company.workspaces.first()
             serializer.save(workspace=workspace)
         except Exception as e:
-            raise serializers.ValidationError(
-                {"workspace": "Nie można określić workspace użytkownika."}
+            # Używamy zadeklarowanego na szczycie pliku rest_framework.exceptions.ValidationError
+            # Zamiast serializers.ValidationError
+            print(f"Błąd zapisu kursu w perform_create: {e}")
+            raise ValidationError(
+                {"detail": f"Nie udało się zapisać kursu: {str(e)}"}
             )
 
     @action(detail=True, methods=['get'])
@@ -517,7 +537,7 @@ class CompanyCourseViewSet(viewsets.ViewSet):
     Zarządzanie kursami w kontekście firmy.
     Ścieżka: /api/companies/{company_pk}/courses/
     """
-    permission_classes = [permissions.IsAuthenticated, IsCompanyAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsCompanyAdminOrHR]
 
     # GET: Lista kursów firmy
     def list(self, request, company_pk=None):
@@ -729,3 +749,128 @@ class OnboardingTaskInstanceViewSet(viewsets.ModelViewSet):
     serializer_class = OnboardingTaskInstanceSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['onboarding', 'assigned_to_user', 'status']
+
+class UserBadgeViewSet(viewsets.ModelViewSet):
+    """
+    Endpoint pozwalający na ręczne przydzielanie i pobieranie 
+    odznak konkretnego użytkownika.
+    """
+    queryset = UserBadge.objects.all()
+    serializer_class = UserBadgeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Filtrowanie odznak po konkretnym użytkowniku: ?user_id=X
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            return self.queryset.filter(user_id=user_id)
+        return self.queryset
+    
+class DashboardView(APIView):
+    """
+    Endpoint agregujący statystyki i aktywności dla Dashboardu.
+    Zwraca inne dane dla Admina/HR, a inne dla zwykłego pracownika.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user_company = UserCompany.objects.select_related('company').get(user=request.user)
+            company = user_company.company
+            role = user_company.role
+        except UserCompany.DoesNotExist:
+            return Response({"error": "Brak przypisanej firmy."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # --- DANE DLA ADMINA / HR ---
+        if role in ['admin', 'super_admin', 'hr']:
+            employees_count = UserCompany.objects.filter(company=company).count()
+            courses_count = Course.objects.filter(workspace__company=company).count()
+            
+            recent_onboardings = OnboardingTaskInstance.objects.filter(
+                onboarding__template__workspace__company=company
+            ).select_related('assigned_to_user', 'template_task').order_by('-id')[:5]
+
+            activities = []
+            for task in recent_onboardings:
+                user_name = f"{task.assigned_to_user.first_name} {task.assigned_to_user.last_name}".strip() or task.assigned_to_user.email
+                status_map = {"pending": "Rozpoczął", "in_progress": "Kontynuuje", "completed": "Ukończył"}
+                
+                activities.append({
+                    "user": user_name,
+                    "action": status_map.get(task.status, "Aktualizacja zadania"),
+                    "course": task.template_task.title,
+                    "time": "Ostatnio"
+                })
+
+            return Response({
+                "stats": {
+                    "courses": courses_count,
+                    "employees": employees_count,
+                    "avg_completion_hours": 4.5
+                },
+                "activities": activities
+            }, status=status.HTTP_200_OK)
+
+        # --- DANE DLA PRACOWNIKA ---
+        else:
+            assignments = CourseAssignment.objects.filter(user=request.user)
+            # Zliczamy ukończone (gdzie status to explicit 'completed' lub string zawierający '100')
+            completed_count = assignments.filter(status__icontains='100').count() + assignments.filter(status='completed').count()
+            in_progress_count = assignments.exclude(status='completed').exclude(status__icontains='100').count()
+
+            return Response({
+                "stats": {
+                    "completed_courses": completed_count,
+                    "in_progress_courses": in_progress_count,
+                    "learning_time": "12h",
+                    "streak": 1
+                },
+                "activities": [] # Puste dla pracownika
+            }, status=status.HTTP_200_OK)
+        
+class GamificationAnalyticsView(APIView):
+    """Endpoint agregujący pełne statystyki profilu grywalizacyjnego pracownika."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        
+        # 1. Łączny dorobek punktowy
+        total_xp = XPTransaction.objects.filter(user=user).aggregate(Sum('amount'))['amount__sum'] or 0
+
+        # 2. Rozkład tygodniowy (Pn - Nd) dla bieżącego tygodnia
+        now = timezone.now()
+        start_of_week = now - datetime.timedelta(days=now.weekday())
+        start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        weekly_xp = [0] * 7
+        transactions_this_week = XPTransaction.objects.filter(user=user, created_at__gte=start_of_week)
+        for t in transactions_this_week:
+            # t.created_at.weekday() zwraca 0 dla Pn, 6 dla Nd
+            weekly_xp[t.created_at.weekday()] += t.amount
+
+        # 3. Ostatnie aktywności użytkownika
+        recent = XPTransaction.objects.filter(user=user).order_by('-created_at')[:5]
+        recent_serializer = XPTransactionSerializer(recent, many=True)
+
+        # 4. Lista kamieni milowych z bazy (jeśli pusta, zwracamy domyślne)
+        milestones = Milestone.objects.order_by('level')
+        if not milestones.exists():
+            # Automatyczne uzupełnienie podstawowych progów w bazie przy pierwszym wywołaniu
+            Milestone.objects.bulk_create([
+                Milestone(level=1, title="Nowicjusz", required_xp=0),
+                Milestone(level=2, title="Uczeń", required_xp=250),
+                Milestone(level=3, title="Praktykant", required_xp=750),
+                Milestone(level=4, title="Junior", required_xp=1500),
+                Milestone(level=5, title="Mid", required_xp=3000),
+            ])
+            milestones = Milestone.objects.order_by('level')
+
+        milestones_serializer = MilestoneSerializer(milestones, many=True)
+
+        return Response({
+            "total_xp": total_xp,
+            "weekly_xp": weekly_xp,
+            "recent_activities": recent_serializer.data,
+            "milestones": milestones_serializer.data
+        }, status=status.HTTP_200_OK)

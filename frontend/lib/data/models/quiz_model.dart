@@ -8,10 +8,11 @@ class Quiz {
   factory Quiz.fromJson(Map<String, dynamic> json) {
     return Quiz(
       id: json['id'],
-      title: json['title'],
-      questions: (json['questions'] as List<dynamic>)
-          .map((e) => Question.fromJson(e))
-          .toList(),
+      title: json['title'] ?? '',
+      questions: (json['questions'] as List<dynamic>?)
+              ?.map((e) => Question.fromJson(e))
+              .toList() ??
+          [],
     );
   }
 }
@@ -19,38 +20,29 @@ class Quiz {
 class Question {
   final int id;
   final String questionText;
-  final String questionType;
+  final String? questionType;
   final String? imageUrl;
   final List<Answer> answers;
-  final int? correct;
 
   Question({
     required this.id,
     required this.questionText,
-    required this.questionType,
+    this.questionType,
     this.imageUrl,
     required this.answers,
-    this.correct,
   });
 
   factory Question.fromJson(Map<String, dynamic> json) {
     return Question(
       id: json['id'],
-      questionText: json['question_text'],
+      questionText: json['question_text'] ?? '',
       questionType: json['question_type'],
       imageUrl: json['image_url'],
-      answers: (json['answers'] as List<dynamic>)
-          .map((e) => Answer.fromJson(e))
-          .toList(),
-       correct: json['correct'],
+      answers: (json['answers'] as List<dynamic>?)
+              ?.map((e) => Answer.fromJson(e))
+              .toList() ??
+          [],
     );
-  }
-  Map<String, dynamic> toJson() {
-    return {
-      'question': questionText,
-      'answers': answers.map((a) => a.answerText).toList(),
-      'correct': correct,
-    };
   }
 }
 
@@ -63,7 +55,30 @@ class Answer {
   factory Answer.fromJson(Map<String, dynamic> json) {
     return Answer(
       id: json['id'],
-      answerText: json['answer_text'],
+      answerText: json['answer_text'] ?? '',
+    );
+  }
+}
+
+class QuizResult {
+  final int quizId;
+  final int totalQuestions;
+  final int correctAnswers;
+  final double score;
+
+  QuizResult({
+    required this.quizId,
+    required this.totalQuestions,
+    required this.correctAnswers,
+    required this.score,
+  });
+
+  factory QuizResult.fromJson(Map<String, dynamic> json) {
+    return QuizResult(
+      quizId: json['quiz_id'],
+      totalQuestions: json['total_questions'],
+      correctAnswers: json['correct_answers'],
+      score: (json['score'] as num).toDouble(),
     );
   }
 }

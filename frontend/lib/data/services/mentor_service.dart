@@ -1,86 +1,78 @@
-import 'dart:async';
+import 'dart:convert';
 import '../models/mentor_model.dart';
+import 'api_client.dart';
+import 'auth_service.dart';
+import '../../core/utils/token_manager.dart';
 
 class MentorService {
-  static final List<MentorModel> _mockMentors = [
-    const MentorModel(
-      id: '1',
-      name: 'Piotr Wiśniewski',
-      role: 'Senior Frontend Developer',
-      department: 'Engineering',
-      rating: 4.9,
-      reviewCount: 24,
-      activeTasksCount: 2,
-      expertise: ['React', 'TypeScript', 'CSS', 'UX'],
-    ),
-    const MentorModel(
-      id: '2',
-      name: 'Anna Nowak',
-      role: 'HR Business Partner',
-      department: 'Human Resources',
-      rating: 4.7,
-      reviewCount: 31,
-      activeTasksCount: 4,
-      expertise: ['Onboarding', 'Procesy HR', 'Komunikacja'],
-    ),
-    const MentorModel(
-      id: '3',
-      name: 'Tomasz Kowalczyk',
-      role: 'Backend Lead',
-      department: 'Engineering',
-      rating: 4.8,
-      reviewCount: 18,
-      activeTasksCount: 1,
-      expertise: ['Node.js', 'PostgreSQL', 'Docker', 'Architektura'],
-    ),
-    const MentorModel(
-      id: '4',
-      name: 'Maria Lewandowska',
-      role: 'Product Manager',
-      department: 'Product',
-      rating: 4.6,
-      reviewCount: 15,
-      activeTasksCount: 3,
-      expertise: ['Roadmap', 'Agile', 'Stakeholder Management'],
-    ),
-    const MentorModel(
-      id: '5',
-      name: 'Krzysztof Zając',
-      role: 'DevOps Engineer',
-      department: 'Infrastructure',
-      rating: 4.5,
-      reviewCount: 9,
-      activeTasksCount: 2,
-      expertise: ['CI/CD', 'Kubernetes', 'AWS'],
-    ),
-  ];
-
+  
+  /// Pobiera listę pracowników firmy i dla każdego dociąga statystyki ocen
   static Future<List<MentorModel>> fetchMentors() async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    return List.from(_mockMentors);
+    final token = await TokenManager.getToken();
+    final currentUser = await AuthService.getCurrentUser();
+
+    if (currentUser == null || currentUser.companyId == null) {
+      return [];
+    }
+
+    final companyId = currentUser.companyId!;
+    
+    // 1. Pobranie pracowników firmy
+    final response = await ApiClient.get(
+      'companies/$companyId/users/',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode != 200) return [];
+    
+    final List<dynamic> usersData = jsonDecode(utf8.decode(response.bodyBytes));
+    List<MentorModel> mentors = [];
+
+    // 2. Dla każdego pracownika pobieramy zagregowane statystyki (średnia i liczba ocen)
+    for (var userJson in usersData) {
+      final String userId = userJson['user_id'].toString();
+      final String role = userJson['role'] ?? 'Pracownik';
+      
+      double avgRating = 0.0;
+      int reviewCount = 0;
+      
+      try {
+        final statsResponse = await ApiClient.get(
+          'api/ratings/mentor/$userId/stats/',
+          headers: {'Authorization': 'Bearer $token'},
+        );
+        
+        if (statsResponse.statusCode == 200) {
+          final statsData = jsonDecode(utf8.decode(statsResponse.bodyBytes));
+          avgRating = (statsData['average_rating'] as num?)?.toDouble() ?? 0.0;
+          reviewCount = (statsData['total_ratings'] as num?)?.toInt() ?? 0;
+        }
+      } catch (e) {
+        // Brak ocen lub błąd dla tego usera – zostawiamy z wartościami 0.0
+      }
+
+      mentors.add(MentorModel(
+        id: userId,
+        name: '${userJson['first_name']} ${userJson['last_name']}'.trim(),
+        role: role,
+        department: 'Firma', 
+        rating: avgRating,
+        reviewCount: reviewCount,
+        activeTasksCount: 0, 
+        expertise: ['Mentoring', 'Wdrożenie'], 
+        avatar: null,
+      ));
+    }
+
+    return mentors;
   }
 
   static Future<bool> assignMentor(String mentorId, String? taskTitle) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    // Update active task count for simulation
-    final idx = _mockMentors.indexWhere((m) => m.id == mentorId);
-    if (idx != -1) {
-      final old = _mockMentors[idx];
-      _mockMentors[idx] = MentorModel(
-        id: old.id,
-        name: old.name,
-        role: old.role,
-        department: old.department,
-        rating: old.rating,
-        reviewCount: old.reviewCount,
-        activeTasksCount: old.activeTasksCount + 1,
-        expertise: old.expertise,
-        avatar: old.avatar,
-      );
-    }
+    // Logika przypisania zadań (będzie integrowana w module zadań HR)
     return true;
   }
 
+  /// Przesyła nową ocenę na serwer
   static Future<bool> submitRating({
     required String mentorId,
     required int rating,
@@ -88,25 +80,22 @@ class MentorService {
     Map<String, int>? criteriaRatings,
     List<String>? tags,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    // Simulate updating rating and review count
-    final idx = _mockMentors.indexWhere((m) => m.id == mentorId);
-    if (idx != -1) {
-      final old = _mockMentors[idx];
-      final newReviewCount = old.reviewCount + 1;
-      final newRating = ((old.rating * old.reviewCount) + rating) / newReviewCount;
-      _mockMentors[idx] = MentorModel(
-        id: old.id,
-        name: old.name,
-        role: old.role,
-        department: old.department,
-        rating: double.parse(newRating.toStringAsFixed(1)),
-        reviewCount: newReviewCount,
-        activeTasksCount: old.activeTasksCount,
-        expertise: old.expertise,
-        avatar: old.avatar,
-      );
-    }
-    return true;
+    final token = await TokenManager.getToken();
+    
+    final response = await ApiClient.post(
+      'api/ratings/',
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        // Model MentorRating w Django oczekuje klucza obcego `mentor` oraz `rating` i `comment`
+        'mentor': int.parse(mentorId), 
+        'rating': rating,
+        'comment': comment,
+      }),
+    );
+
+    return response.statusCode == 201 || response.statusCode == 200;
   }
 }

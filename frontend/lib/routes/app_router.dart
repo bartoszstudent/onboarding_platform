@@ -76,7 +76,7 @@ class AppRouter {
           GoRoute(
             path: '/courses',
             builder: (context, state) =>
-                const CoursesListScreen(role: 'employee'),
+                const CoursesListScreen(),
           ),
           GoRoute(
             path: '/users',

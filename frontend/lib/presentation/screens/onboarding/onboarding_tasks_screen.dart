@@ -4,6 +4,7 @@ import '../../../core/constants/design_tokens.dart';
 import '../../ui/app_card.dart';
 import '../../ui/input.dart';
 import '../../ui/stat_card.dart';
+import '../../../data/services/onboarding_service.dart';
 
 class OnboardingTask {
   final String id;
@@ -127,14 +128,33 @@ class _OnboardingTasksScreenState
 
   OnboardingTask? selectedTask;
 
-  @override
-  void initState() {
-    super.initState();
+   List<OnboardingTask> tasks = [];
+  bool isLoading = true;
+  
 
-    searchController.addListener(() {
-      setState(() {});
+  @override
+void initState() {
+  super.initState();
+  searchController.addListener(() {
+    setState(() {});
+  });
+  _loadTasksFromApi(); // Nowe
+}
+
+Future<void> _loadTasksFromApi() async {
+  try {
+    final fetchedTasks = await OnboardingService().fetchTasks();
+    setState(() {
+      tasks = fetchedTasks;
+      isLoading = false;
+    });
+  } catch (e) {
+    setState(() {
+      isLoading = false;
+      // Tu dodaj ewentualną obsługę błędu (np. SnackBar z błędem)
     });
   }
+}
 
   @override
   void dispose() {
@@ -144,88 +164,12 @@ class _OnboardingTasksScreenState
 
   final bool isHR = true;
 
-  final List<OnboardingTask> tasks = const [
-    OnboardingTask(
-      id: '1',
-      title: 'Konfiguracja środowiska deweloperskiego',
-      description:
-          'Zainstaluj i skonfiguruj wszystkie wymagane narzędzia: VS Code, Git, Docker, Node.js.',
-      status: 'completed',
-      priority: 'high',
-      assignee: 'Jan Kowalski',
-      mentor: 'Piotr Wiśniewski',
-      mentorRating: 5,
-      dueDate: '2024-01-10',
-      completedDate: '2024-01-09',
-      category: 'Techniczna',
-      progress: 100,
-    ),
-    OnboardingTask(
-      id: '2',
-      title: 'Wprowadzenie do procesów firmowych',
-      description:
-          'Zapoznaj się z procedurami HR, systemem ticketów i workflow zespołu.',
-      status: 'in_progress',
-      priority: 'high',
-      assignee: 'Jan Kowalski',
-      mentor: 'Anna Nowak',
-      dueDate: '2024-01-20',
-      category: 'Procesy',
-      progress: 60,
-    ),
-    OnboardingTask(
-      id: '3',
-      title: 'Szkolenie z bezpieczeństwa danych (RODO)',
-      description:
-          'Ukończ obowiązkowy kurs dotyczący ochrony danych osobowych.',
-      status: 'in_progress',
-      priority: 'high',
-      assignee: 'Jan Kowalski',
-      dueDate: '2024-01-15',
-      category: 'Compliance',
-      progress: 30,
-    ),
-    OnboardingTask(
-      id: '4',
-      title: 'Poznaj zespół i interesariuszy',
-      description:
-          'Umów spotkania 1:1 z kluczowymi osobami w organizacji.',
-      status: 'pending',
-      priority: 'medium',
-      assignee: 'Jan Kowalski',
-      dueDate: '2024-01-25',
-      category: 'Integracja',
-      progress: 0,
-    ),
-    OnboardingTask(
-      id: '5',
-      title: 'Przegląd dokumentacji projektu',
-      description:
-          'Przeczytaj dokumentację techniczną i architekturę aktualnych projektów.',
-      status: 'overdue',
-      priority: 'medium',
-      assignee: 'Jan Kowalski',
-      mentor: 'Tomasz Kowalczyk',
-      dueDate: '2024-01-08',
-      category: 'Techniczna',
-      progress: 45,
-    ),
-    OnboardingTask(
-      id: '6',
-      title: 'First commit do repozytorium',
-      description:
-          'Wprowadź swoją pierwszą zmianę do projektu i przejdź przez proces code review.',
-      status: 'pending',
-      priority: 'low',
-      assignee: 'Jan Kowalski',
-      dueDate: '2024-02-01',
-      category: 'Techniczna',
-      progress: 0,
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+    return const Center(child: CircularProgressIndicator());
+  }
     if (selectedTask != null) {
       return TaskDetailsView(
         task: selectedTask!,

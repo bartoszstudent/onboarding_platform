@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import '../../../data/services/competency_service.dart';
+import '../../../data/models/competency_model.dart';
 
 class CompetencyProgressScreen extends StatefulWidget {
   final String pathId;
@@ -19,30 +20,65 @@ class _CompetencyProgressScreenState extends State<CompetencyProgressScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  final int totalXp = 1950;
+  bool _isLoading = true;
+  String? _errorMessage;
 
-  final milestones = const [
-    {'level': 1, 'title': 'Nowicjusz', 'xp': 0},
-    {'level': 2, 'title': 'Uczeń', 'xp': 500},
-    {'level': 3, 'title': 'Praktykant', 'xp': 1500},
-    {'level': 4, 'title': 'Junior', 'xp': 3000},
-    {'level': 5, 'title': 'Mid', 'xp': 6000},
-  ];
+  // Stan danych z API
+  int _totalXp = 0;
+  List<int> _weeklyXp = [0, 0, 0, 0, 0, 0, 0];
+  List<dynamic> _recentActivities = [];
+  List<dynamic> _milestones = [];
+  List<CompetencyPath> _allPaths = [];
+  CompetencyPath? _currentPath;
 
-  final recentActivity = const [
-    {'title': 'TypeScript — Generics', 'xp': 150, 'time': '2h temu', 'icon': 'book-open.svg'},
-    {'title': 'Quick Learner badge', 'xp': 200, 'time': '1d temu', 'icon': 'award.svg'},
-    {'title': 'React Fundamentals', 'xp': 500, 'time': '3d temu', 'icon': 'star.svg'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _loadAllAnalytics();
+  }
 
-  final radarData = const [
-    {'subject': 'Frontend', 'value': 80},
-    {'subject': 'Backend', 'value': 30},
-    {'subject': 'Komunikacja', 'value': 60},
-    {'subject': 'Agile', 'value': 100},
-    {'subject': 'Security', 'value': 10},
-    {'subject': 'DevOps', 'value': 25},
-  ];
+  Future<void> _loadAllAnalytics() async {
+    try {
+      final analytics = await CompetencyService.fetchGamificationAnalytics();
+      final paths = await CompetencyService.getPaths();
+
+      if (mounted) {
+        setState(() {
+          _totalXp = analytics['total_xp'] ?? 0;
+          _weeklyXp = List<int>.from(analytics['weekly_xp'] ?? [0, 0, 0, 0, 0, 0, 0]);
+          _recentActivities = analytics['recent_activities'] ?? [];
+          _milestones = analytics['milestones'] ?? [];
+          _allPaths = paths;
+          _currentPath = paths.firstWhere(
+            (p) => p.id == widget.pathId,
+            orElse: () => paths.isNotEmpty ? paths.first : throw Exception('Brak ścieżki'),
+          );
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Map<String, dynamic> get currentLevel {
+    if (_milestones.isEmpty) return {'level': 1, 'title': 'Nowicjusz', 'required_xp': 0};
+    return _milestones.lastWhere(
+      (m) => _totalXp >= (m['required_xp'] as int),
+      orElse: () => _milestones.first,
+    );
+  }
+
+  Map<String, dynamic>? get nextLevel {
+    final nextList = _milestones.where((m) => _totalXp < (m['required_xp'] as int));
+    return nextList.isNotEmpty ? nextList.first : null;
+  }
 
   BarChartGroupData _bar(int x, double y) {
     return BarChartGroupData(
@@ -50,7 +86,7 @@ class _CompetencyProgressScreenState extends State<CompetencyProgressScreen>
       barRods: [
         BarChartRodData(
           toY: y,
-          width: 80,
+          width: 20,
           borderRadius: BorderRadius.circular(6),
           color: Colors.blue,
         ),
@@ -59,29 +95,24 @@ class _CompetencyProgressScreenState extends State<CompetencyProgressScreen>
   }
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  Map get currentLevel =>
-      milestones.lastWhere((m) => totalXp >= (m['xp'] as int));
-
-  Map? get nextLevel =>
-      milestones.where((m) => totalXp < (m['xp'] as int)).isNotEmpty
-          ? milestones.where((m) => totalXp < (m['xp'] as int)).first
-          : null;
-
-  @override
   Widget build(BuildContext context) {
-    final nextXp = nextLevel?['xp'] ?? 1;
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_errorMessage != null || _currentPath == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Postęp kompetencyjny")),
+        body: Center(child: Text('Wystąpił błąd ładowania danych: $_errorMessage')),
+      );
+    }
+
+    final int nextXpThreshold = nextLevel?['required_xp'] ?? _totalXp;
+    final double progressPercent = nextXpThreshold > 0 ? (_totalXp / nextXpThreshold).clamp(0.0, 1.0) : 1.0;
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text("Postęp kompetencyjny"),
-      ),
-
+      appBar: AppBar(title: Text(_currentPath!.name)),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -89,9 +120,7 @@ class _CompetencyProgressScreenState extends State<CompetencyProgressScreen>
               margin: const EdgeInsets.all(12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
-                ),
+                gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF7C3AED)]),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Column(
@@ -103,23 +132,14 @@ class _CompetencyProgressScreenState extends State<CompetencyProgressScreen>
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "$totalXp XP",
-                    style: const TextStyle(
-                      fontSize: 26,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    "$_totalXp XP",
+                    style: const TextStyle(fontSize: 26, color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
-                  LinearProgressIndicator(
-                    value: totalXp / nextXp,
-                    backgroundColor: Colors.white24,
-                    color: Colors.white,
-                  ),
+                  LinearProgressIndicator(value: progressPercent, backgroundColor: Colors.white24, color: Colors.white),
                 ],
               ),
             ),
-
             TabBar(
               controller: _tabController,
               isScrollable: true,
@@ -131,8 +151,17 @@ class _CompetencyProgressScreenState extends State<CompetencyProgressScreen>
                 Tab(text: "Mapa kompetencji"),
               ],
             ),
-
-           _buildTabs(),
+            SizedBox(
+              height: 520,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _overview(),
+                  _activity(),
+                  _radar(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -140,255 +169,112 @@ class _CompetencyProgressScreenState extends State<CompetencyProgressScreen>
   }
 
   Widget _overview() {
-    final currentIndex = milestones.lastIndexWhere(
-      (m) => totalXp >= (m['xp'] as int),
-    );
-
-    final visibleMilestones = milestones.take(currentIndex + 3).toList();
+    final currentLvlIdx = _milestones.indexWhere((m) => m['level'] == currentLevel['level']);
+    final visibleMilestones = _milestones.skip(currentLvlIdx).take(3).toList();
 
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        
         GridView.count(
           crossAxisCount: 4,
           mainAxisSpacing: 6,
           crossAxisSpacing: 6,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 3.2,
-          children: const [
-            _SmallCard("Kursy", "4"),
-            _SmallCard("Skills", "10"),
-            _SmallCard("Odznaki", "3"),
-            _SmallCard("Seria dni", "7"),
+          childAspectRatio: 1.1,
+          children: [
+            _SmallCard("Kursy ścieżki", "${_currentPath!.totalSkills}"),
+            _SmallCard("Ukończone", "${_currentPath!.completedSkills}"),
+            _SmallCard("Postęp", "${_currentPath!.progress}%"),
+            _SmallCard("Ogólne Lvl", "${currentLevel['level']}"),
           ],
         ),
-
         const SizedBox(height: 12),
-
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'XP w tym tygodniu',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
-              ),
-
+              const Text('Aktywność XP w tym tygodniu', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
               const SizedBox(height: 16),
-
               SizedBox(
-                height: 220,
+                height: 160,
                 child: BarChart(
                   BarChartData(
                     alignment: BarChartAlignment.spaceAround,
-                   
                     titlesData: FlTitlesData(
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
                           getTitlesWidget: (value, meta) {
                             const days = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                days[value.toInt()],
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            );
+                            if (value.toInt() >= 0 && value.toInt() < days.length) {
+                              return Text(days[value.toInt()], style: const TextStyle(fontSize: 10));
+                            }
+                            return const Text('');
                           },
                         ),
                       ),
-
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 32,
-                          getTitlesWidget: (value, meta) {
-                            return Text(
-                              value.toInt().toString(),
-                              style: const TextStyle(fontSize: 10),
-                            );
-                          },
-                        ),
-                      ),
-
+                      leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                       rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     ),
-
-                    borderData: FlBorderData(
-                      show: true,
-                      border: const Border(
-                        left: BorderSide(color: Colors.grey, width: 1),
-                        bottom: BorderSide(color: Colors.grey, width: 1),
-                      ),
-                    ),
-
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: true,
-                      drawHorizontalLine: true,
-                      getDrawingHorizontalLine: (value) {
-                        return FlLine(
-                          color: Colors.grey.withOpacity(0.2),
-                          strokeWidth: 1,
-                        );
-                      },
-                      getDrawingVerticalLine: (value) {
-                        return FlLine(
-                          color: Colors.grey.withOpacity(0.2),
-                          strokeWidth: 1,
-                        );
-                      },
-                    ),
-
-                    barGroups: [
-                      _bar(0, 120),
-                      _bar(1, 200),
-                      _bar(2, 80),
-                      _bar(3, 340),
-                      _bar(4, 160),
-                      _bar(5, 0),
-                      _bar(6, 50),
-                    ],
-
-                    barTouchData: BarTouchData(
-                      enabled: true,
-                      touchTooltipData: BarTouchTooltipData(
-                        tooltipPadding: const EdgeInsets.all(8),
-                        tooltipMargin: 8,
-                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                          return BarTooltipItem(
-                            '${rod.toY.toInt()} XP',
-                            const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                    gridData: const FlGridData(show: false),
+                    borderData: FlBorderData(show: false),
+                    barGroups: List.generate(7, (i) => _bar(i, _weeklyXp[i].toDouble())),
                   ),
                 ),
               )
             ],
           ),
         ),
-
         const SizedBox(height: 12),
-
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "Kamienie milowe",
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
-              ),
-
+              const Text("Nadchodzące cele", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
               const SizedBox(height: 16),
-
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: List.generate(visibleMilestones.length, (i) {
-                    final m = visibleMilestones[i];
-                    final unlocked = totalXp >= (m['xp'] as int);
-
+                  children: visibleMilestones.map<Widget>((m) {
+                    final unlocked = _totalXp >= (m['required_xp'] as int);
                     return Row(
                       children: [
                         Container(
-                          width: 90,
-                          padding: const EdgeInsets.all(12),
+                          width: 100,
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: unlocked
-                                ? Colors.blue.withOpacity(0.06)
-                                : Colors.grey.withOpacity(0.05),
+                            color: unlocked ? Colors.green.withOpacity(0.05) : Colors.grey.withOpacity(0.05),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: unlocked
-                                  ? Colors.blue.withOpacity(0.3)
-                                  : Colors.grey.shade300,
-                            ),
+                            border: Border.all(color: unlocked ? Colors.green.withOpacity(0.3) : Colors.grey.shade300),
                           ),
                           child: Column(
                             children: [
-                              const Text("⭐", style: TextStyle(fontSize: 18)),
-
-                              const SizedBox(height: 6),
-
-                              Text(
-                                m['title'] as String,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-
-                              const SizedBox(height: 6),
-
-                              Text(
-                                "${m['xp']} XP",
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey,
-                                ),
-                              ),
+                              Text(unlocked ? "✅" : "🔒", style: const TextStyle(fontSize: 16)),
+                              const SizedBox(height: 4),
+                              Text(m['title'] ?? '', textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 4),
+                              Text("${m['required_xp']} XP", style: const TextStyle(fontSize: 10, color: Colors.grey)),
                             ],
                           ),
                         ),
-
-                        if (i != visibleMilestones.length - 1) ...[
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8),
-                            child: Text(
-                              ">",
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+                        const SizedBox(width: 8),
                       ],
                     );
-                  }),
+                  }).toList(),
                 ),
               ),
             ],
@@ -399,200 +285,101 @@ class _CompetencyProgressScreenState extends State<CompetencyProgressScreen>
   }
 
   Widget _activity() {
-    return ListView(
+    if (_recentActivities.isEmpty) {
+      return const Center(child: Text("Brak zarejestrowanych operacji XP w bazie."));
+    }
+
+    return ListView.builder(
       padding: const EdgeInsets.all(12),
-      children: recentActivity.map((a) {
+      itemCount: _recentActivities.length,
+      itemBuilder: (context, index) {
+        final item = _recentActivities[index];
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
           child: Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: SvgPicture.asset(
-                  'assets/icons/${a['icon']}',
-                ),
-              ),
-
+              const CircleAvatar(radius: 18, backgroundColor: Colors.blue, child: Icon(Icons.bolt, color: Colors.blue, size: 20)),
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      a['title'] as String,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      a['time'] as String,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
-                    ),
+                    Text(item['reason'] ?? 'Przyznanie punktów', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(item['time_ago'] ?? 'Niedawno', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                   ],
                 ),
               ),
-
-              Text(
-                "+${a['xp']} XP",
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.green,
-                ),
-              ),
+              Text("+${item['amount']} XP", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 13)),
             ],
           ),
         );
-      }).toList(),
+      },
     );
   }
 
   Widget _radar() {
+    if (_allPaths.isEmpty) return const Center(child: Text("Brak przypisanych ścieżek kompetencyjnych."));
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            const Text(
-              "Mapa kompetencji",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-
+            const Text("Zrównoważenie rozwoju", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 24),
-
             SizedBox(
-              height: 350,
+              height: 220,
               child: RadarChart(
                 RadarChartData(
                   radarShape: RadarShape.polygon,
-
-                  tickCount: 5,
-                  ticksTextStyle: const TextStyle(
-                    color: Colors.transparent,
-                  ),
-
-                  gridBorderData: const BorderSide(
-                    color: Color(0xFFD9D9D9),
-                  ),
-
+                  tickCount: 4,
+                  ticksTextStyle: const TextStyle(color: Colors.transparent),
+                  gridBorderData: const BorderSide(color: Color(0xFFE2E8F0)),
                   titlePositionPercentageOffset: 0.15,
-
                   getTitle: (index, angle) {
-                    final titles = [
-                      "Frontend",
-                      "Backend",
-                      "Komunikacja",
-                      "Agile",
-                      "Security",
-                      "DevOps",
-                    ];
-
-                    return RadarChartTitle(
-                      text: titles[index],
-                      angle: angle,
-                    );
+                    if (index >= 0 && index < _allPaths.length) {
+                      return RadarChartTitle(text: _allPaths[index].name, angle: angle);
+                    }
+                    return const RadarChartTitle(text: '');
                   },
-
                   dataSets: [
                     RadarDataSet(
-                      fillColor: Colors.blue.withOpacity(0.25),
-                      borderColor: Colors.blue,
-                      entryRadius: 2,
-
-                      dataEntries: const [
-                        RadarEntry(value: 80),
-                        RadarEntry(value: 30),
-                        RadarEntry(value: 60),
-                        RadarEntry(value: 100),
-                        RadarEntry(value: 10),
-                        RadarEntry(value: 25),
-                      ],
+                      fillColor: Colors.purple.withOpacity(0.15),
+                      borderColor: Colors.purple,
+                      entryRadius: 3,
+                      dataEntries: _allPaths.map((p) => RadarEntry(value: p.progress.toDouble())).toList(),
                     ),
                   ],
                 ),
               ),
             ),
-
-            const SizedBox(height: 32),
-
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: radarData.length,
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 5,
-                crossAxisSpacing: 5,
-                childAspectRatio: 12.3,
+            const SizedBox(height: 20),
+            ..._allPaths.map((path) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6.0),
+              child: Row(
+                children: [
+                  Expanded(child: Text(path.name, style: const TextStyle(fontSize: 13))),
+                  SizedBox(
+                    width: 100,
+                    child: LinearProgressIndicator(value: path.progress / 100, minHeight: 5, borderRadius: BorderRadius.circular(10)),
+                  ),
+                  const SizedBox(width: 10),
+                  Text("${path.progress}%", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
               ),
-              itemBuilder: (context, index) {
-                final item = radarData[index];
-
-                return _CompetencyCard(
-                  title: item['subject'] as String,
-                  value: item['value'] as int,
-                );
-              },
-            ),
+            )),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildTabs() {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height,
-      child: TabBarView(
-        controller: _tabController,
-        children: [
-          _overview(),
-          _activity(),
-          _radar(),
-        ],
       ),
     );
   }
@@ -607,82 +394,19 @@ class _SmallCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withOpacity(0.1)),
+        color: Colors.blue.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.blue.withOpacity(0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 11, color: Colors.grey),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CompetencyCard extends StatelessWidget {
-  final String title;
-  final int value;
-
-  const _CompetencyCard({
-    required this.title,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 14,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F7FB),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-              ),
-            ),
-          ),
-
-          SizedBox(
-            width: 100,
-            child: LinearProgressIndicator(
-              value: value / 100,
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(20),
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Text(
-            "$value%",
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text(title, style: const TextStyle(fontSize: 9, color: Colors.grey)),
+          const SizedBox(height: 2),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
         ],
       ),
     );

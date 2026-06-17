@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from rest_framework import serializers
+from django.db import transaction
 from .models.training import Course, CourseAssignment
 from .models.section import Section
 from .models.block import Block
@@ -10,7 +11,14 @@ from .models import UserCompany, Company, CourseAssignment, OnboardingTemplate, 
     OnboardingTaskTemplate, Onboarding, \
     OnboardingTaskInstance, Quiz, MentorRating
 from .models.competencies import Competency, CompetencyCourse
-from .models import Badge, Question, Answer
+from .models import Badge, Question, Answer, UserBadge
+from .models import XPTransaction, Milestone
+from .models.training import Course
+from .models.section import Section
+from .models.block import Block
+from .models.quiz import Quiz
+from .models.question import Question
+from .models.answer import Answer
 
 # ============================================================================
 # BLOCK SERIALIZERS
@@ -226,8 +234,10 @@ class CourseSerializer(serializers.ModelSerializer):
 
 
 class CourseCreateUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for creating and updating courses"""
-    
+    """Serializer for creating and updating courses with nested structures"""
+    # Wymagane pole, by Django przepuściło "sections" przesłane z frontendu
+    sections = serializers.JSONField(write_only=True, required=False)
+
     class Meta:
         model = Course
         fields = [
@@ -237,15 +247,81 @@ class CourseCreateUpdateSerializer(serializers.ModelSerializer):
             'thumbnail',
             'duration',
             'completion_badge',
+            'sections',
         ]
-    
+        read_only_fields = ['workspace'] 
+
     def validate_title(self, value):
-        """Validate that title is not empty"""
         if not value or not value.strip():
             raise serializers.ValidationError("Course title cannot be empty.")
         return value.strip()
 
-
+    @transaction.atomic
+    def create(self, validated_data):
+        sections_data = validated_data.pop('sections', [])
+        
+        # 1. Tworzymy i zapisujemy nadrzędny kurs
+        course = Course.objects.create(**validated_data)
+        
+        # 2. Tworzymy sekcje
+        for s_idx, section_data in enumerate(sections_data):
+            section = Section.objects.create(
+                course=course,
+                title=section_data.get('title', f'Sekcja {s_idx + 1}'),
+                order=s_idx
+            )
+            
+            # 3. Tworzymy bloki wewnątrz sekcji
+            blocks_data = section_data.get('blocks', [])
+            for b_idx, block_data in enumerate(blocks_data):
+                raw_b_type = block_data.get('block_type', 'TEXT')
+                b_type = raw_b_type.upper() if isinstance(raw_b_type, str) else 'TEXT'
+                content = block_data.get('content', '')
+                
+                # Przygotowujemy relacje bloków, rygorystycznie omijając błędy pól tekstowych
+                block_kwargs = {
+                    'section': section,
+                    'block_type': b_type,
+                    'order': b_idx,
+                    'text_content': content if b_type == 'TEXT' else None,
+                    'image_url': content if b_type == 'IMAGE' and content else None,
+                    'video_url': content if b_type == 'VIDEO' and content else None,
+                }
+                
+                # 4. Generowanie pytań i odpowiedzi dla typu QUIZ
+                if b_type == 'QUIZ' and 'quiz' in block_data:
+                    quiz_data = block_data['quiz']
+                    
+                    quiz_instance = Quiz.objects.create(
+                        title=str(quiz_data.get('title', 'Quiz podsumowujący'))[:255],
+                        passing_score=80
+                    )
+                    
+                    questions_data = quiz_data.get('questions', [])
+                    for q_idx, q_data in enumerate(questions_data):
+                        question_instance = Question.objects.create(
+                            quiz=quiz_instance,
+                            question_text=str(q_data.get('text', 'Pytanie'))[:500],
+                            question_type='MC',  
+                            order=q_idx + 1 
+                        )
+                        
+                        answers_data = q_data.get('answers', [])
+                        for a_data in answers_data:
+                            Answer.objects.create(
+                                question=question_instance,
+                                answer_text=str(a_data.get('text', 'Odpowiedź'))[:255],
+                                is_correct=bool(a_data.get('is_correct', False))
+                            )
+                    
+                    # Przypisanie gotowego testu do obiektu parametru bloku
+                    block_kwargs['quiz'] = quiz_instance
+                
+                # 5. Ostateczny zapis powiązanego bloku z uciętymi relacjami do bazy
+                Block.objects.create(**block_kwargs)
+                
+        return course
+        
 # ============================================================================
 # QUIZ/QUESTION/ANSWER SERIALIZERS
 # ============================================================================
@@ -286,10 +362,20 @@ class QuizDetailSerializer(serializers.ModelSerializer):
 
 class BadgeSerializer(serializers.ModelSerializer):
     """Serializer for Badge model"""
+    xpReward = serializers.IntegerField(source='xp_reward', read_only=True)
     
     class Meta:
         model = Badge
-        fields = ['id', 'name', 'description', 'image']
+        fields = ['id', 'name', 'description', 'image', 'icon', 'category', 'rarity', 'xpReward']
+        read_only_fields = ['id']
+
+class UserBadgeSerializer(serializers.ModelSerializer):
+    """Serializer for manual badge assignment"""
+    badge_details = BadgeSerializer(source='badge', read_only=True)
+    
+    class Meta:
+        model = UserBadge
+        fields = ['id', 'user', 'badge', 'badge_details']
         read_only_fields = ['id']
 
 
@@ -507,10 +593,22 @@ class OnboardingTemplateSerializer(serializers.ModelSerializer):
 # ==========================================
 
 class OnboardingTaskInstanceSerializer(serializers.ModelSerializer):
+    # Wyciągamy pola z szablonu, aby zminimalizować zmiany na frontendzie
+    title = serializers.CharField(source='template_task.title', read_only=True)
+    description = serializers.CharField(source='template_task.description', read_only=True)
+    category = serializers.CharField(source='template_task.category', read_only=True)
+    priority = serializers.CharField(source='template_task.priority', read_only=True)
+    
+    # Opcjonalnie: możemy też zwrócić czytelne imiona
+    assignee_name = serializers.CharField(source='assigned_to_user.first_name', read_only=True)
+    mentor_name = serializers.CharField(source='mentor_user.first_name', read_only=True)
+
     class Meta:
         model = OnboardingTaskInstance
-        fields = ['id', 'onboarding', 'template_task', 'assigned_to_user', 'assigned_by_user', 'mentor_user', 'status']
-        read_only_fields = ['assigned_by_user']
+        fields = [
+            'id', 'status', 'title', 'description', 'category', 'priority', 
+            'due_date', 'completed_date', 'progress', 'assignee_name', 'mentor_name'
+        ]
 
     def validate(self, data):
         """
@@ -591,3 +689,26 @@ class MentorRatingSerializer(serializers.ModelSerializer):
 class MentorStatsSerializer(serializers.Serializer):
     average_rating = serializers.FloatField()
     total_ratings = serializers.IntegerField()
+
+class XPTransactionSerializer(serializers.ModelSerializer):
+    time_ago = serializers.SerializerMethodField()
+
+    class Meta:
+        model = XPTransaction
+        fields = ['id', 'amount', 'reason', 'time_ago']
+
+    def get_time_ago(self, obj):
+        now = timezone.now()
+        diff = now - obj.created_at
+        if diff.days == 0:
+            hours = diff.seconds // 3600
+            if hours == 0:
+                return "Przed chwilą"
+            return f"{hours}h temu"
+        return f"{diff.days}d temu"
+
+
+class MilestoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Milestone
+        fields = ['level', 'title', 'required_xp']

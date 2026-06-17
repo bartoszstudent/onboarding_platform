@@ -4,6 +4,7 @@ from django.conf import settings
 from .workspaces import Workspace
 from .onboarding import OnboardingTaskInstance
 from .training import Course
+from django.utils import timezone
 
 
 class Badge(models.Model):
@@ -17,6 +18,10 @@ class Badge(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     image = models.ImageField(upload_to="badge_images/", blank=True, null=True)
+    icon = models.CharField(max_length=50, default='star')
+    category = models.CharField(max_length=100, default='Ogólne')
+    rarity = models.CharField(max_length=50, default='common') # common, rare, epic, legendary
+    xp_reward = models.IntegerField(default=100)
 
     def __str__(self):
         return self.name
@@ -63,3 +68,23 @@ class MentorRating(models.Model):
 
         def __str__(self):
             return f"Rating {self.rating} for Mentor {self.mentor_id}"
+        
+class XPTransaction(models.Model):
+    """Rejestr pojedynczych transakcji zdobywania punktów doświadczenia przez użytkownika."""
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='xp_transactions')
+    amount = models.IntegerField()
+    reason = models.CharField(max_length=255)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.user.username}: +{self.amount} XP ({self.reason})"
+
+
+class Milestone(models.Model):
+    """Definicja progów poziomów (kamieni milowych) ustawiana globalnie w systemie."""
+    level = models.IntegerField(unique=True)
+    title = models.CharField(max_length=100)
+    required_xp = models.IntegerField()
+
+    def __str__(self):
+        return f"Poziom {self.level}: {self.title} ({self.required_xp} XP)"
