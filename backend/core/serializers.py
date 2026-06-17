@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from rest_framework import serializers
+from django.db import transaction
 from .models.training import Course, CourseAssignment
 from .models.section import Section
 from .models.block import Block
@@ -12,6 +13,12 @@ from .models import UserCompany, Company, CourseAssignment, OnboardingTemplate, 
 from .models.competencies import Competency, CompetencyCourse
 from .models import Badge, Question, Answer, UserBadge
 from .models import XPTransaction, Milestone
+from .models.training import Course
+from .models.section import Section
+from .models.block import Block
+from .models.quiz import Quiz
+from .models.question import Question
+from .models.answer import Answer
 
 # ============================================================================
 # BLOCK SERIALIZERS
@@ -227,8 +234,10 @@ class CourseSerializer(serializers.ModelSerializer):
 
 
 class CourseCreateUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for creating and updating courses"""
-    
+    """Serializer for creating and updating courses with nested structures"""
+    # Wymagane pole, by Django przepuściło "sections" przesłane z frontendu
+    sections = serializers.JSONField(write_only=True, required=False)
+
     class Meta:
         model = Course
         fields = [
@@ -238,15 +247,81 @@ class CourseCreateUpdateSerializer(serializers.ModelSerializer):
             'thumbnail',
             'duration',
             'completion_badge',
+            'sections',
         ]
-    
+        read_only_fields = ['workspace'] 
+
     def validate_title(self, value):
-        """Validate that title is not empty"""
         if not value or not value.strip():
             raise serializers.ValidationError("Course title cannot be empty.")
         return value.strip()
 
-
+    @transaction.atomic
+    def create(self, validated_data):
+        sections_data = validated_data.pop('sections', [])
+        
+        # 1. Tworzymy i zapisujemy nadrzędny kurs
+        course = Course.objects.create(**validated_data)
+        
+        # 2. Tworzymy sekcje
+        for s_idx, section_data in enumerate(sections_data):
+            section = Section.objects.create(
+                course=course,
+                title=section_data.get('title', f'Sekcja {s_idx + 1}'),
+                order=s_idx
+            )
+            
+            # 3. Tworzymy bloki wewnątrz sekcji
+            blocks_data = section_data.get('blocks', [])
+            for b_idx, block_data in enumerate(blocks_data):
+                raw_b_type = block_data.get('block_type', 'TEXT')
+                b_type = raw_b_type.upper() if isinstance(raw_b_type, str) else 'TEXT'
+                content = block_data.get('content', '')
+                
+                # Przygotowujemy relacje bloków, rygorystycznie omijając błędy pól tekstowych
+                block_kwargs = {
+                    'section': section,
+                    'block_type': b_type,
+                    'order': b_idx,
+                    'text_content': content if b_type == 'TEXT' else None,
+                    'image_url': content if b_type == 'IMAGE' and content else None,
+                    'video_url': content if b_type == 'VIDEO' and content else None,
+                }
+                
+                # 4. Generowanie pytań i odpowiedzi dla typu QUIZ
+                if b_type == 'QUIZ' and 'quiz' in block_data:
+                    quiz_data = block_data['quiz']
+                    
+                    quiz_instance = Quiz.objects.create(
+                        title=str(quiz_data.get('title', 'Quiz podsumowujący'))[:255],
+                        passing_score=80
+                    )
+                    
+                    questions_data = quiz_data.get('questions', [])
+                    for q_idx, q_data in enumerate(questions_data):
+                        question_instance = Question.objects.create(
+                            quiz=quiz_instance,
+                            question_text=str(q_data.get('text', 'Pytanie'))[:500],
+                            question_type='MC',  
+                            order=q_idx + 1 
+                        )
+                        
+                        answers_data = q_data.get('answers', [])
+                        for a_data in answers_data:
+                            Answer.objects.create(
+                                question=question_instance,
+                                answer_text=str(a_data.get('text', 'Odpowiedź'))[:255],
+                                is_correct=bool(a_data.get('is_correct', False))
+                            )
+                    
+                    # Przypisanie gotowego testu do obiektu parametru bloku
+                    block_kwargs['quiz'] = quiz_instance
+                
+                # 5. Ostateczny zapis powiązanego bloku z uciętymi relacjami do bazy
+                Block.objects.create(**block_kwargs)
+                
+        return course
+        
 # ============================================================================
 # QUIZ/QUESTION/ANSWER SERIALIZERS
 # ============================================================================

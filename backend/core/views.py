@@ -511,8 +511,11 @@ class CourseViewSet(viewsets.ModelViewSet):
             workspace = user_company.company.workspaces.first()
             serializer.save(workspace=workspace)
         except Exception as e:
-            raise serializers.ValidationError(
-                {"workspace": "Nie można określić workspace użytkownika."}
+            # Używamy zadeklarowanego na szczycie pliku rest_framework.exceptions.ValidationError
+            # Zamiast serializers.ValidationError
+            print(f"Błąd zapisu kursu w perform_create: {e}")
+            raise ValidationError(
+                {"detail": f"Nie udało się zapisać kursu: {str(e)}"}
             )
 
     @action(detail=True, methods=['get'])

@@ -25,4 +25,24 @@ class CourseService {
       throw Exception('Nie udało się pobrać kursów');
     }
   }
+  static Future<bool> createCourse(Map<String, dynamic> courseData) async {
+    final token = await TokenManager.getToken();
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/courses/'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(courseData),
+    );
+
+    // Zwraca true, jeśli kurs (i cała jego zagnieżdżona struktura) został poprawnie utworzony (201 Created)
+    if (response.statusCode == 201) {
+      return true;
+    } else {
+      print('Błąd tworzenia kursu: ${response.body}');
+      return false;
+    }
+  }
 }
