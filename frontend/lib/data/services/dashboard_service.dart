@@ -82,4 +82,49 @@ class DashboardService {
       return List.generate(7, (index) => 0.05);
     }
   }
+  /// Pobiera listę ostatnich osiągnięć (aktywności XP) dla osi czasu w profilu pracownika
+  static Future<List<Map<String, String>>> getRecentAchievements() async {
+    try {
+      final token = await TokenManager.getToken();
+      final response = await ApiClient.get(
+        'api/gamification/analytics/',
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        
+        // Zwracamy listę z backendu (domyślnie pustą, jeśli jej brakuje)
+        final List<dynamic> recent = data['recent_activities'] ?? [];
+        
+        return recent.map<Map<String, String>>((item) {
+          // Formatowanie daty z backendu np. "2026-06-17T09:51:00Z" na "17.06.2026"
+          String dateStr = '';
+          if (item['created_at'] != null) {
+            DateTime dt = DateTime.parse(item['created_at']);
+            dateStr = "${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year}";
+          }
+          
+          String reason = item['reason'] ?? 'Aktywność na platformie';
+          int amount = item['amount'] ?? 0;
+          
+          // Ustawianie ikon na podstawie słów kluczowych w uzasadnieniu z bazy
+          String icon = "⚡"; // Domyślna ikona zdobytych XP
+          if (reason.toLowerCase().contains("odznaka")) icon = "🏆";
+          if (reason.toLowerCase().contains("quiz")) icon = "📝";
+          if (reason.toLowerCase().contains("kurs")) icon = "🎓";
+          
+          return {
+            "date": dateStr,
+            "title": "Zdobyto $amount XP",
+            "desc": reason,
+            "icon": icon,
+          };
+        }).toList();
+      }
+    } catch (e) {
+      throw Exception('Błąd pobierania historii osiągnięć: $e');
+    }
+    return [];
+  }
 }

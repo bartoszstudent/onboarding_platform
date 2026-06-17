@@ -26,6 +26,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? _role;
   UserModel? _user;
   bool _loadingUser = true;
+  String _companyName = 'Moja Firma';
 
   @override
   void initState() {
@@ -40,11 +41,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final user = await AuthService.getCurrentUser();
       final role = await AuthService.getRole();
+      final companyName = await AuthService.getCompanyName() ?? 'TechCorp Sp. z o.o.';
       if (mounted) {
         setState(() {
           _role = role;
           _user = user;
           _loadingUser = false;
+          _companyName = companyName;
         });
       }
     } catch (e) {
@@ -109,8 +112,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: Colors.white24,
                   borderRadius: BorderRadius.circular(Tokens.radius),
                 ),
-                child: const Text('TechCorp Sp. z o.o.',
-                    style: TextStyle(color: Colors.white)),
+                child: Text(
+                  _companyName, // PODMIANA: Teraz nazwa firmy ładuje się dynamicznie z bazy
+                  style: const TextStyle(color: Colors.white),
+                ),
               )
             ],
           ),

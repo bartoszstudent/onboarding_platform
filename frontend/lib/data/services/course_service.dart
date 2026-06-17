@@ -45,4 +45,22 @@ class CourseService {
       return false;
     }
   }
+  static Future<List<Course>> fetchUserCourses(String userId) async {
+    final token = await TokenManager.getToken();
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/users/$userId/courses/'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final List data = json.decode(utf8.decode(response.bodyBytes));
+      return data.map((e) => Course.fromJson(e)).toList();
+    } else {
+      throw Exception('Nie udało się pobrać kursów pracownika');
+    }
+  }
 }
