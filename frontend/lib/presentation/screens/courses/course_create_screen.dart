@@ -3,6 +3,7 @@ import '../../ui/app_card.dart';
 import '../../ui/input.dart';
 import '../../ui/app_button.dart';
 import '../../../core/constants/design_tokens.dart';
+import '../../../data/services/course_service.dart'; // DODANY IMPORT
 
 enum BlockType { text, image, video, quiz }
 
@@ -95,6 +96,8 @@ class _CourseCreateScreenState extends State<CourseCreateScreen> {
   late TextEditingController _thumbnailController;
   final List<CourseSection> _sections = [];
   final _formKey = GlobalKey<FormState>();
+  
+  bool _isSaving = false; // NOWA ZMIENNA: Stan ładowania
 
   @override
   void initState() {
@@ -113,6 +116,99 @@ class _CourseCreateScreenState extends State<CourseCreateScreen> {
       section.dispose();
     }
     super.dispose();
+  }
+
+  // --- NOWA METODA ASYNCHRONICZNA DO WYSYŁKI DANYCH ---
+  Future<void> _submitCourse() async {
+    if (!_formKey.currentState!.validate()) return;
+    
+    // Walidacja czy przynajmniej jedna odpowiedź w quizach jest oznaczona jako poprawna
+    for (var section in _sections) {
+      for (var block in section.blocks) {
+        if (block.type == BlockType.quiz && block.quizQuestion != null) {
+          if (block.quizQuestion!.correctAnswerIndex == -1) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Jeden z quizów nie ma zaznaczonej poprawnej odpowiedzi!')),
+            );
+            return;
+          }
+        }
+      }
+    }
+
+    setState(() { _isSaving = true; });
+
+    // Konstruowanie struktury JSON dla backendu
+    final coursePayload = {
+      "title": _titleController.text.trim(),
+      "description": _descController.text.trim(),
+      "sections": _sections.map((section) {
+        return {
+          "title": section.titleController.text.trim(),
+          "blocks": section.blocks.map((block) {
+            // Mapowanie typu BlockType na string z backendu
+            String beType = 'text';
+            if (block.type == BlockType.image) beType = 'image';
+            if (block.type == BlockType.video) beType = 'video';
+            if (block.type == BlockType.quiz) beType = 'quiz';
+
+            Map<String, dynamic> blockPayload = {
+              "block_type": beType,
+              "content": block.contentController.text.trim(),
+            };
+
+            // Jeśli to quiz, dodajemy zagnieżdżoną strukturę quizu i pytań
+            if (block.type == BlockType.quiz && block.quizQuestion != null) {
+              final q = block.quizQuestion!;
+              blockPayload["quiz"] = {
+                "title": "Quiz dla modułu", // Można by pobierać osobny tytuł, na razie domyślny
+                "questions": [
+                  {
+                    "text": q.questionController.text.trim(),
+                    "answers": q.answersControllers.asMap().entries.map((entry) {
+                      int idx = entry.key;
+                      var ctrl = entry.value;
+                      return {
+                        "text": ctrl.text.trim(),
+                        "is_correct": q.correctAnswerIndex == idx
+                      };
+                    }).toList()
+                  }
+                ]
+              };
+            }
+            return blockPayload;
+          }).toList(),
+        };
+      }).toList(),
+    };
+
+    try {
+      final success = await CourseService.createCourse(coursePayload);
+      
+      if (!mounted) return;
+      
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Kurs został opublikowany z sukcesem!')),
+        );
+        Navigator.pop(context, true); // Zwracamy true jako sygnał do odświeżenia listy kursów
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Błąd podczas zapisywania kursu.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Wystąpił błąd: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() { _isSaving = false; });
+      }
+    }
   }
 
   void _addSection() {
@@ -152,9 +248,9 @@ class _CourseCreateScreenState extends State<CourseCreateScreen> {
       case BlockType.text:
         return 'Blok tekstu';
       case BlockType.image:
-        return 'Obraz';
+        return 'URL Obrazu (np. https://...)';
       case BlockType.video:
-        return 'Wideo';
+        return 'URL Wideo (np. https://youtube.com/...)';
       case BlockType.quiz:
         return 'Quiz';
     }
@@ -219,6 +315,8 @@ class _CourseCreateScreenState extends State<CourseCreateScreen> {
                           controller: _titleController,
                           labelText: 'Tytuł kursu',
                           hintText: 'np. Wprowadzenie do React',
+                          // PROSTA WALIDACJA
+                          validator: (val) => val == null || val.isEmpty ? 'Podaj tytuł' : null,
                         ),
                         const SizedBox(height: 16),
                         AppInput(
@@ -232,9 +330,9 @@ class _CourseCreateScreenState extends State<CourseCreateScreen> {
                   ),
                   const SizedBox(height: 28),
 
-                  // Miniatura kursu
+                  // Miniatura kursu (aktualnie omijana przy API, zrobimy to jako ew. pole w przyszłości)
                   Text(
-                    'Miniatura kursu',
+                    'Miniatura kursu (Wkrótce)',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 16),
@@ -316,28 +414,19 @@ class _CourseCreateScreenState extends State<CourseCreateScreen> {
 
                   const SizedBox(height: 28),
 
-                  // Przyciski akcji
+                  // ZMIANA Z MACZU NA RZECZYWISTY PRZYCISK
                   Row(
                     children: [
                       Expanded(
                         child: AppButton(
-                          label: 'Opublikuj',
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Kurs opublikowany (mock)!'),
-                                ),
-                              );
-                              Navigator.pop(context);
-                            }
-                          },
+                          label: _isSaving ? 'Zapisywanie...' : 'Opublikuj',
+                          onPressed: _isSaving ? () {} : _submitCourse,
                           primary: true,
                         ),
                       ),
                       const SizedBox(width: 12),
                       OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: _isSaving ? null : () => Navigator.pop(context),
                         child: const Text('Anuluj'),
                       ),
                     ],
@@ -367,6 +456,7 @@ class _CourseCreateScreenState extends State<CourseCreateScreen> {
                   controller: section.titleController,
                   labelText: 'Tytuł sekcji',
                   hintText: 'np. Podstawy',
+                  validator: (val) => val == null || val.isEmpty ? 'Podaj tytuł sekcji' : null,
                 ),
               ),
               IconButton(
@@ -474,10 +564,11 @@ class _CourseCreateScreenState extends State<CourseCreateScreen> {
               controller: block.contentController,
               labelText: _getBlockTypeLabel(block.type),
               hintText: block.type == BlockType.image
-                  ? 'URL obrazu...'
+                  ? 'URL obrazu (np. https://)...'
                   : block.type == BlockType.video
-                      ? 'URL wideo...'
+                      ? 'URL wideo (np. YouTube)...'
                       : 'Wpisz treść...',
+              validator: (val) => val == null || val.isEmpty ? 'To pole nie może być puste' : null,
             ),
           ),
           const SizedBox(width: 12),
@@ -520,7 +611,7 @@ class _CourseCreateScreenState extends State<CourseCreateScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Quiz',
+                    'Quiz (Tylko jedno poprawne pytanie)',
                     style: Theme.of(context).textTheme.labelLarge,
                   ),
                 ],
@@ -539,12 +630,13 @@ class _CourseCreateScreenState extends State<CourseCreateScreen> {
             controller: quiz.questionController,
             labelText: 'Pytanie',
             hintText: 'Wpisz pytanie...',
+            validator: (val) => val == null || val.isEmpty ? 'Pytanie nie może być puste' : null,
           ),
           const SizedBox(height: 16),
 
           // Odpowiedzi
           Text(
-            'Odpowiedzi',
+            'Odpowiedzi (zaznacz prawidłową)',
             style: Theme.of(context).textTheme.labelMedium,
           ),
           const SizedBox(height: 12),
@@ -588,6 +680,7 @@ class _CourseCreateScreenState extends State<CourseCreateScreen> {
             controller: quiz.answersControllers[index],
             labelText: 'Odpowiedź ${index + 1}',
             hintText: 'Wpisz odpowiedź...',
+            validator: (val) => val == null || val.isEmpty ? 'Podaj odpowiedź' : null,
           ),
         ),
       ],

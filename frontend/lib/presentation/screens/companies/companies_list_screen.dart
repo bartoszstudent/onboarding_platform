@@ -38,6 +38,7 @@ class _CompanyManagementScreenState extends State<CompanyManagementScreen> {
   bool _showEdit = false;
   bool _showManage = false;
   bool _isLoading = true;
+  String? _error;
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
@@ -53,26 +54,23 @@ class _CompanyManagementScreenState extends State<CompanyManagementScreen> {
   Future<void> _loadCompanies() async {
     setState(() {
       _isLoading = true;
+      _error = null;
     });
 
     try {
       final companies = await CompanyService.listCompanies();
+
       setState(() {
         _apiCompanies = companies;
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('Błąd pobierania firm: $e');
+
       setState(() {
         _isLoading = false;
+        _error = 'Nie udało się załadować danych';
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Błąd pobierania firm: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 
@@ -268,7 +266,19 @@ class _CompanyManagementScreenState extends State<CompanyManagementScreen> {
                           child: CircularProgressIndicator(),
                         ),
                       )
-                    : Column(
+                      : _error != null
+                          ? Center(
+                              child: Text(_error!),
+                            )
+                          : filtered.isEmpty
+                              ? Padding(
+                                  padding: const EdgeInsets.all(40.0),
+                                  child: Text(
+                                    'Brak firm do wyświetlenia',
+                                    style: TextStyle(color: Tokens.textMuted2),
+                                  ),
+                                )
+                          : Column(
                   children: [
                     Container(
                       color: Tokens.gray50,
@@ -286,14 +296,6 @@ class _CompanyManagementScreenState extends State<CompanyManagementScreen> {
                         ],
                       ),
                     ),
-                    if (filtered.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(40.0),
-                        child: Text(
-                          'Brak firm do wyświetlenia',
-                          style: TextStyle(color: Tokens.textMuted2),
-                        ),
-                      ),
                     ...filtered.map((c) {
                       return _HoverableListItem(
                         onTap: () {},

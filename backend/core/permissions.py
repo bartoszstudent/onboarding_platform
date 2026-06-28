@@ -3,42 +3,73 @@ from .models import UserCompany, Workspace
 
 class IsCompanyAdmin(permissions.BasePermission):
     """
-    Pozwala na dostęp tylko użytkownikom, którzy mają rolę 'admin' lub 'owner' w danej firmie.
-    Wymaga przekazania 'company_id' w URL lub w body (zależnie od kontekstu).
+    Pozwala na dostęp TYLKO administratorom i właścicielom.
+    (Do użycia przy wrażliwych operacjach jak edycja samej firmy)
     """
-
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
 
-        # Próbujemy pobrać company_id z argumentów URL (np. /api/companies/<id>/users/)
         company_id = view.kwargs.get('company_pk') or view.kwargs.get('pk')
-        
-        # Jeśli to request POST do tworzenia kursu, company_id może być w request.data
         if not company_id and request.method == 'POST':
             company_id = request.data.get('company_id')
 
         if not company_id:
-            # W przypadku braku ID w prostym sprawdzeniu, puszczamy dalej do has_object_permission
             return True 
 
         return UserCompany.objects.filter(
             user=request.user, 
             company_id=company_id, 
-            role__in=['admin', 'owner']
+            role__in=['admin', 'owner', 'super_admin']
         ).exists()
 
     def has_object_permission(self, request, view, obj):
-        # Sprawdzenie przy edycji konkretnego obiektu (np. Firmy)
-        if hasattr(obj, 'company'): # Np. Workspace, Course
+        if hasattr(obj, 'company'): 
             company = obj.company
         elif isinstance(obj, UserCompany):
             company = obj.company
         else:
-            company = obj # Zakładamy, że obj to Company
+            company = obj 
 
         return UserCompany.objects.filter(
             user=request.user, 
             company=company, 
-            role__in=['admin', 'owner']
+            role__in=['admin', 'owner', 'super_admin']
+        ).exists()
+
+
+class IsCompanyAdminOrHR(permissions.BasePermission):
+    """
+    Pozwala na dostęp Administratorom, Właścicielom ORAZ pracownikom HR.
+    (Idealne dla widoków zarządzania kursami, onboardingiem i pracownikami)
+    """
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        company_id = view.kwargs.get('company_pk') or view.kwargs.get('pk')
+        if not company_id and request.method == 'POST':
+            company_id = request.data.get('company_id')
+
+        if not company_id:
+            return True 
+
+        return UserCompany.objects.filter(
+            user=request.user, 
+            company_id=company_id, 
+            role__in=['admin', 'owner', 'super_admin', 'hr']
+        ).exists()
+
+    def has_object_permission(self, request, view, obj):
+        if hasattr(obj, 'company'): 
+            company = obj.company
+        elif isinstance(obj, UserCompany):
+            company = obj.company
+        else:
+            company = obj 
+
+        return UserCompany.objects.filter(
+            user=request.user, 
+            company=company, 
+            role__in=['admin', 'owner', 'super_admin', 'hr']
         ).exists()

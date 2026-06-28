@@ -1,20 +1,34 @@
 class DashboardStats {
+  // Pola Admina
   final int courses;
   final int employees;
   final double avgCompletionHours;
 
+  // Pola Pracownika
+  final int completedCourses;
+  final int inProgressCourses;
+  final String learningTime;
+  final int streak;
+
   DashboardStats({
-    required this.courses,
-    required this.employees,
-    required this.avgCompletionHours,
+    this.courses = 0,
+    this.employees = 0,
+    this.avgCompletionHours = 0.0,
+    this.completedCourses = 0,
+    this.inProgressCourses = 0,
+    this.learningTime = '0h',
+    this.streak = 0,
   });
 
   factory DashboardStats.fromJson(Map<String, dynamic> json) {
     return DashboardStats(
       courses: json['courses'] as int? ?? 0,
       employees: json['employees'] as int? ?? 0,
-      avgCompletionHours:
-          (json['avg_completion_hours'] as num?)?.toDouble() ?? 0.0,
+      avgCompletionHours: (json['avg_completion_hours'] as num?)?.toDouble() ?? 0.0,
+      completedCourses: json['completed_courses'] as int? ?? 0,
+      inProgressCourses: json['in_progress_courses'] as int? ?? 0,
+      learningTime: json['learning_time'] as String? ?? '0h',
+      streak: json['streak'] as int? ?? 0,
     );
   }
 

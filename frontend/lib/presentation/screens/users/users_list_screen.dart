@@ -1,8 +1,7 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
+import 'package:go_router/go_router.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../core/utils/token_manager.dart';
 
@@ -103,14 +102,17 @@ class _UsersListScreenState extends State<UsersListScreen> {
       future: _usersFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
 
         if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              snapshot.error.toString(),
-              style: const TextStyle(color: Colors.red),
+          debugPrint(snapshot.error.toString());
+          
+          return const Scaffold(
+            body: Center(
+              child: Text('Nie udało się załadować danych'),
             ),
           );
         }
@@ -128,6 +130,14 @@ class _UsersListScreenState extends State<UsersListScreen> {
 
           return matchesSearch && matchesRole;
         }).toList();
+
+        if (filtered.isEmpty) {
+          return const Scaffold(
+            body: Center(
+              child: Text('Brak użytkowników do wyświetlenia'),
+            ),
+          );
+        }
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -305,6 +315,14 @@ class _UsersListScreenState extends State<UsersListScreen> {
                                         );
                                       },
                                       child: const Text('Przypisz kursy'),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    TextButton(
+                                      onPressed: () {
+                                        final name = _nameFromEmail(email);
+                                        context.go('/mentor-assign?taskTitle=Wdrożenie $name');
+                                      },
+                                      child: const Text('Przypisz mentora'),
                                     ),
                                   ],
                                 ),

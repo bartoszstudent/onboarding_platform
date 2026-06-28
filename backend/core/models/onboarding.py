@@ -11,6 +11,9 @@ class OnboardingTaskTemplate(models.Model):
     template = models.ForeignKey(OnboardingTemplate, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     sequence = models.PositiveIntegerField()
+    description = models.TextField(blank=True, null=True)
+    category = models.CharField(max_length=100, default='Techniczna')
+    priority = models.CharField(max_length=20, default='medium')
 
 class Onboarding(models.Model):
     template = models.ForeignKey(OnboardingTemplate, on_delete=models.CASCADE)
@@ -35,3 +38,6 @@ class OnboardingTaskInstance(models.Model):
                                     on_delete=models.SET_NULL, null=True)
 
     status = models.CharField(max_length=50)
+    due_date = models.DateField(null=True, blank=True)
+    completed_date = models.DateField(null=True, blank=True)
+    progress = models.IntegerField(default=0)

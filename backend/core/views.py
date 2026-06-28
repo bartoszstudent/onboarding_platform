@@ -3,37 +3,72 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.core import signing
+from django.db.models import Avg, Count
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from rest_framework import viewsets, permissions, status, generics, views
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import viewsets, permissions, status, generics, views, filters
+from rest_framework.exceptions import ValidationError
 from .models.training import Course, CourseAssignment
-from .serializers import CourseSerializer, CourseAssignmentSerializer
+from .serializers import CourseSerializer, CourseAssignmentSerializer, MentorStatsSerializer, MentorRatingSerializer
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, action
-from rest_framework.permissions import AllowAny
-from .models import Quiz, Company, UserCompany, Answer, Workspace, Course, CourseAssignment
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from .models import (Quiz, Company, UserCompany, Answer, Workspace, Course, CourseAssignment, Badge, UserBadge, \
+                     OnboardingTemplate, \
+                     OnboardingTaskInstance, Onboarding, \
+                     OnboardingTemplate, \
+                     OnboardingTaskInstance, OnboardingTaskTemplate, MentorRating)
 from .serializers import QuizDetailSerializer, CompanySerializer
 from django.shortcuts import get_object_or_404
 from .models.workspaces import User  # lub get_user_model()
-from .serializers import ( 
+from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
+from .models.progress import SectionProgress
+from .models.section import Section
+from .serializers import (  
+    CourseDetailSerializer, 
+    CourseListSerializer,
+    CourseCreateUpdateSerializer,
     CourseSerializer, 
     CompanyUserAddSerializer, 
     UserCompanyListSerializer,
     BulkCourseAssignmentSerializer,
     CourseAssignmentSerializer,
     CompetencySerializer,
-    CompetencyDetailSerializer
+    CompetencyDetailSerializer,
+    BadgeSerializer,
+    OnboardingTemplateSerializer,
+    OnboardingTaskTemplateSerializer,
+    OnboardingSerializer,
+    OnboardingTaskInstanceSerializer
 )
-from .permissions import IsCompanyAdmin
-from .models.competencies import Competency
 
+from .models import Badge
+from .permissions import IsCompanyAdmin, IsCompanyAdminOrHR
+from .models.competencies import Competency
+from . import serializers
+from .models import UserBadge
+from .serializers import UserBadgeSerializer
+from .models import CourseAssignment, UserBadge
+import datetime
+from django.db.models import Sum
+from rest_framework.views import APIView
+from .models import XPTransaction, Milestone
+from .serializers import XPTransactionSerializer, MilestoneSerializer
 User = get_user_model()
 
 # ile sekund ważny jest token (tu: 7 dni)
 AUTH_TOKEN_MAX_AGE = 60 * 60 * 24 * 7  # 7 dni
 
+class BadgeViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows badges to be viewed or edited.
+    """
+    queryset = Badge.objects.all()
+    serializer_class = BadgeSerializer
 
 def _generate_token(user) -> str:
     """
@@ -239,22 +274,6 @@ def get_company(request, pk):
         )
     serializer = CompanySerializer(company)
     return Response(serializer.data, status=status.HTTP_200_OK)
-class CourseViewSet(viewsets.ModelViewSet):
-    serializer_class = CourseSerializer
-    # Zmieniamy AllowAny na IsAuthenticated, aby mieć dostęp do request.user
-    permission_classes = [permissions.IsAuthenticated] 
-
-    def get_queryset(self):
-        user = self.request.user
-        # Wersja 2: Bardziej jawna (czytelniejsza)
-        try:
-            # Pobieramy firmę użytkownika (zakładając relację OneToOne w UserCompany)
-            user_company = user.user_company 
-            return Course.objects.filter(workspace__company=user_company.company)
-        except (UserCompany.DoesNotExist, AttributeError):
-            # Jeśli użytkownik nie ma przypisanej firmy, nie widzi żadnych kursów
-            return Course.objects.none()
-
 class UserAssignedCoursesViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API endpoint to view courses assigned to a specific user.
@@ -283,6 +302,39 @@ class CourseAssignmentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Set the 'assigned_by_user' to the current user automatically
         serializer.save(assigned_by_user=self.request.user)
+
+    def _resolve_badge_for_completion(self, assignment, badge_id):
+        if badge_id is not None and badge_id != '':
+            try:
+                badge = Badge.objects.get(pk=int(badge_id))
+            except (TypeError, ValueError):
+                raise ValidationError({'badge_id': 'badge_id musi być liczbą całkowitą.'})
+            except Badge.DoesNotExist:
+                raise ValidationError({'badge_id': 'Nie znaleziono odznaki o podanym ID.'})
+        else:
+            badge = assignment.course.completion_badge
+
+        if badge is None:
+            return None
+
+        if badge.workspace_id != assignment.course.workspace_id:
+            raise ValidationError({'badge_id': 'Odznaka musi należeć do tego samego workspace co kurs.'})
+
+        return badge
+
+    def perform_update(self, serializer):
+        assignment = serializer.instance
+        target_status = (serializer.validated_data.get('status', assignment.status) or '').lower()
+        badge = None
+
+        if target_status == 'completed':
+            badge = self._resolve_badge_for_completion(assignment, self.request.data.get('badge_id'))
+
+        assignment = serializer.save()
+
+        if target_status == 'completed' and badge is not None:
+            # Idempotentne przypisanie - brak duplikatów przy kolejnych update'ach.
+            UserBadge.objects.get_or_create(user=assignment.user, badge=badge)
 
 # --- View to get a full quiz with questions and answers ---
 class QuizDetailView(generics.RetrieveAPIView):
@@ -319,6 +371,16 @@ class SubmitQuizView(views.APIView):
         
         score = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
 
+        if score >= 80:
+            # Blokada przed wielokrotnym zdobywaniem punktów za ten sam quiz
+            quiz_reason = f"Zaliczony quiz ID: {pk}"
+            if not XPTransaction.objects.filter(user=request.user, reason=quiz_reason).exists():
+                XPTransaction.objects.create(
+                    user=request.user,
+                    amount=250,
+                    reason=quiz_reason
+                )
+
         # Requirement 4: Show end-score
         return Response({
             "quiz_id": quiz.id,
@@ -327,6 +389,31 @@ class SubmitQuizView(views.APIView):
             "score": round(score, 2)
         }, status=status.HTTP_200_OK)
     
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_quiz_for_course(request, course_id):
+    """
+    Znajduje quiz powiązany z kursem. Przeszukuje bloki w sekcjach kursu i
+    zwraca pierwszy napotkany quiz (jeśli istnieje).
+    """
+    try:
+        course = Course.objects.get(pk=course_id)
+    except Course.DoesNotExist:
+        return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Szukamy pierwszego bloku, który ma przypisany quiz w sekcjach tego kursu
+    from .models import Block
+
+    block = Block.objects.filter(section__course=course, quiz__isnull=False).select_related('quiz').first()
+
+    if not block or not block.quiz:
+        return Response({"detail": "Quiz not found for this course."}, status=status.HTTP_404_NOT_FOUND)
+
+    quiz = block.quiz
+    serializer = QuizDetailSerializer(quiz)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
 class CompanyManagementViewSet(viewsets.ModelViewSet):
     """
     Zarządzanie ustawieniami firmy.
@@ -348,10 +435,9 @@ class CompanyUsersViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
-        # Sprawdzamy metodę requestu zamiast self.action, 
-        # aby uniknąć błędów gdy action nie jest jeszcze ustawione
         if self.request.method in ['POST', 'DELETE']:
-            return [permissions.IsAuthenticated(), IsCompanyAdmin()]
+            # ZMIANA: Zastępujemy IsCompanyAdmin() nową klasą IsCompanyAdminOrHR()
+            return [permissions.IsAuthenticated(), IsCompanyAdminOrHR()]
         return [permissions.IsAuthenticated()]
 
     def list(self, request, company_pk=None):
@@ -371,14 +457,87 @@ class CompanyUsersViewSet(viewsets.ViewSet):
         """Dodawanie użytkownika - wywoływane przez POST, chronione przez IsCompanyAdmin"""
         # ... tutaj zostawiasz swoją logikę dodawania usera ...
         return Response({"status": "user created"}, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, *args, **kwargs):
+        return Response(status=status.HTTP_200_OK)
+
+
+class CourseViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for Course management with full structure.
     
-    
+    GET /api/courses/                  → Lista kursów (basic info)
+    GET /api/courses/{id}/             → Szczegóły kursu (FULL NESTED STRUCTURE)
+    POST /api/courses/                 → Tworzenie kursu
+    PUT/PATCH /api/courses/{id}/       → Edycja kursu
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Pobierz kursy użytkownika z optymalizacją.
+        prefetch_related() redukuje liczbę SQL queries.
+        """
+        user = self.request.user
+        try:
+            user_company = UserCompany.objects.get(user=user)
+            queryset = Course.objects.filter(
+                workspace__company=user_company.company
+            ).prefetch_related(
+                'sections', 
+                'sections__blocks',
+                'sections__blocks__quiz',
+            )
+            return queryset
+        except UserCompany.DoesNotExist:
+            return Course.objects.none()
+
+    def get_serializer_class(self):
+        """Użyj odpowiedniego serializera w zależności od akcji"""
+        if self.action == 'retrieve':
+            return CourseDetailSerializer
+        elif self.action == 'list':
+            return CourseListSerializer
+        elif self.action in ['create']:
+            return CourseCreateUpdateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return CourseCreateUpdateSerializer
+        return CourseSerializer
+
+    def perform_create(self, serializer):
+        """Automatycznie ustaw workspace na workspace użytkownika"""
+        try:
+            user_company = UserCompany.objects.get(user=self.request.user)
+            workspace = user_company.company.workspaces.first()
+            serializer.save(workspace=workspace)
+        except Exception as e:
+            # Używamy zadeklarowanego na szczycie pliku rest_framework.exceptions.ValidationError
+            # Zamiast serializers.ValidationError
+            print(f"Błąd zapisu kursu w perform_create: {e}")
+            raise ValidationError(
+                {"detail": f"Nie udało się zapisać kursu: {str(e)}"}
+            )
+
+    @action(detail=True, methods=['get'])
+    def structure(self, request, pk=None):
+        """
+        Dodatkowy endpoint do pobierania SAMEJ struktury kursu
+        (sekcje + bloki) bez metadanych kursu.
+        
+        GET /api/courses/{id}/structure/ → { sections: [...] }
+        """
+        course = self.get_object()
+        sections = course.sections.all().prefetch_related('blocks')
+        from .serializers import SectionSerializer
+        data = SectionSerializer(sections, many=True).data
+        return Response({"course_id": course.id, "sections": data})
+
 class CompanyCourseViewSet(viewsets.ViewSet):
     """
     Zarządzanie kursami w kontekście firmy.
     Ścieżka: /api/companies/{company_pk}/courses/
     """
-    permission_classes = [permissions.IsAuthenticated, IsCompanyAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsCompanyAdminOrHR]
 
     # GET: Lista kursów firmy
     def list(self, request, company_pk=None):
@@ -438,7 +597,6 @@ class CompanyCourseViewSet(viewsets.ViewSet):
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 class CompetencyViewSet(viewsets.ModelViewSet):
     """
     API endpoint for CRUD operations on Competencies.
@@ -477,3 +635,242 @@ class CompetencyViewSet(viewsets.ModelViewSet):
         
         serializer = CompetencyDetailSerializer(queryset, many=True)
         return Response(serializer.data)
+
+class SectionProgressView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+        user = request.user
+
+        course = get_object_or_404(Course, pk=data.get("course_id"))
+        section = get_object_or_404(Section, pk=data.get("section_id"))
+
+        # optional safety check
+        if section.course_id != course.id:
+            return Response({"detail": "Section does not belong to this course."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        assignment = get_object_or_404(CourseAssignment, user=user, course=course)
+
+        sp, _ = SectionProgress.objects.update_or_create(
+            assignment=assignment,
+            section=section,
+            defaults={"completed": bool(data.get("completed", False))},
+        )
+
+        all_sections = Section.objects.filter(course=course).count()
+        completed_sections = SectionProgress.objects.filter(
+            assignment=assignment, completed=True
+        ).count()
+        progress = int((completed_sections / all_sections) * 100) if all_sections else 0
+
+        assignment.status = f"{progress}% complete"
+        assignment.save(update_fields=["status"])
+
+        return Response({
+            "course_id": course.id,
+            "section_id": section.id,
+            "completed": sp.completed,
+            "progress": progress,
+            "status": assignment.status,
+            "total_sections": all_sections,
+            "completed_sections": completed_sections,
+        }, status=status.HTTP_200_OK)
+
+class MentorRatingViewSet(viewsets.ModelViewSet):
+    queryset = MentorRating.objects.all()
+    serializer_class = MentorRatingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Możliwość filtrowania ocen po mentor_id w query params:
+        GET /api/ratings/?mentor_id=5
+        """
+        queryset = super().get_queryset()
+        mentor_id = self.request.query_params.get('mentor_id')
+        if mentor_id:
+            queryset = queryset.filter(mentor_id=mentor_id)
+        return queryset
+
+    @action(detail=False, url_path='mentor/(?P<mentor_id>\d+)/stats', methods=['get'])
+    def mentor_stats(self, request, mentor_id=None):
+        """
+        Endpoint agregujący: GET /api/ratings/mentor/{mentor_id}/stats/
+        """
+        # Sprawdzamy czy mentor w ogóle istnieje w systemie
+        if not User.objects.filter(id=mentor_id).exists():
+            return Response(
+                {"error": "Mentor nie istnieje."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Agregacja danych z bazy
+        stats = MentorRating.objects.filter(mentor_id=mentor_id).aggregate(
+            average_rating=Avg('rating'),
+            total_ratings=Count('id')
+        )
+
+        # Obsługa przypadku, gdy mentor nie ma jeszcze żadnych ocen
+        if stats['average_rating'] is None:
+            stats['average_rating'] = 0.0
+
+        # Zaokrąglenie średniej do 2 miejsc po przecinku
+        stats['average_rating'] = round(stats['average_rating'], 2)
+
+        serializer = MentorStatsSerializer(stats)
+        return Response(serializer.data, status=status.HTTP_00_OK)
+class OnboardingTemplateViewSet(viewsets.ModelViewSet):
+    queryset = OnboardingTemplate.objects.all().prefetch_related('onboardingtasktemplate_set')
+    serializer_class = OnboardingTemplateSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['workspace']
+    search_fields = ['name']
+
+
+class OnboardingTaskTemplateViewSet(viewsets.ModelViewSet):
+    queryset = OnboardingTaskTemplate.objects.all()
+    serializer_class = OnboardingTaskTemplateSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['template']
+
+
+class OnboardingViewSet(viewsets.ModelViewSet):
+    # prefetch_related optymalizuje zapytania SQL zapobiegając problemowi N+1
+    queryset = Onboarding.objects.all().select_related('template', 'user', 'mentor').prefetch_related('onboardingtaskinstance_set')
+    serializer_class = OnboardingSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['user', 'status', 'template']
+
+
+class OnboardingTaskInstanceViewSet(viewsets.ModelViewSet):
+    queryset = OnboardingTaskInstance.objects.all().select_related('onboarding', 'template_task', 'assigned_to_user')
+    serializer_class = OnboardingTaskInstanceSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['onboarding', 'assigned_to_user', 'status']
+
+class UserBadgeViewSet(viewsets.ModelViewSet):
+    """
+    Endpoint pozwalający na ręczne przydzielanie i pobieranie 
+    odznak konkretnego użytkownika.
+    """
+    queryset = UserBadge.objects.all()
+    serializer_class = UserBadgeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Filtrowanie odznak po konkretnym użytkowniku: ?user_id=X
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            return self.queryset.filter(user_id=user_id)
+        return self.queryset
+    
+class DashboardView(APIView):
+    """
+    Endpoint agregujący statystyki i aktywności dla Dashboardu.
+    Zwraca inne dane dla Admina/HR, a inne dla zwykłego pracownika.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user_company = UserCompany.objects.select_related('company').get(user=request.user)
+            company = user_company.company
+            role = user_company.role
+        except UserCompany.DoesNotExist:
+            return Response({"error": "Brak przypisanej firmy."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # --- DANE DLA ADMINA / HR ---
+        if role in ['admin', 'super_admin', 'hr']:
+            employees_count = UserCompany.objects.filter(company=company).count()
+            courses_count = Course.objects.filter(workspace__company=company).count()
+            
+            recent_onboardings = OnboardingTaskInstance.objects.filter(
+                onboarding__template__workspace__company=company
+            ).select_related('assigned_to_user', 'template_task').order_by('-id')[:5]
+
+            activities = []
+            for task in recent_onboardings:
+                user_name = f"{task.assigned_to_user.first_name} {task.assigned_to_user.last_name}".strip() or task.assigned_to_user.email
+                status_map = {"pending": "Rozpoczął", "in_progress": "Kontynuuje", "completed": "Ukończył"}
+                
+                activities.append({
+                    "user": user_name,
+                    "action": status_map.get(task.status, "Aktualizacja zadania"),
+                    "course": task.template_task.title,
+                    "time": "Ostatnio"
+                })
+
+            return Response({
+                "stats": {
+                    "courses": courses_count,
+                    "employees": employees_count,
+                    "avg_completion_hours": 4.5
+                },
+                "activities": activities
+            }, status=status.HTTP_200_OK)
+
+        # --- DANE DLA PRACOWNIKA ---
+        else:
+            assignments = CourseAssignment.objects.filter(user=request.user)
+            # Zliczamy ukończone (gdzie status to explicit 'completed' lub string zawierający '100')
+            completed_count = assignments.filter(status__icontains='100').count() + assignments.filter(status='completed').count()
+            in_progress_count = assignments.exclude(status='completed').exclude(status__icontains='100').count()
+
+            return Response({
+                "stats": {
+                    "completed_courses": completed_count,
+                    "in_progress_courses": in_progress_count,
+                    "learning_time": "12h",
+                    "streak": 1
+                },
+                "activities": [] # Puste dla pracownika
+            }, status=status.HTTP_200_OK)
+        
+class GamificationAnalyticsView(APIView):
+    """Endpoint agregujący pełne statystyki profilu grywalizacyjnego pracownika."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        
+        # 1. Łączny dorobek punktowy
+        total_xp = XPTransaction.objects.filter(user=user).aggregate(Sum('amount'))['amount__sum'] or 0
+
+        # 2. Rozkład tygodniowy (Pn - Nd) dla bieżącego tygodnia
+        now = timezone.now()
+        start_of_week = now - datetime.timedelta(days=now.weekday())
+        start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        weekly_xp = [0] * 7
+        transactions_this_week = XPTransaction.objects.filter(user=user, created_at__gte=start_of_week)
+        for t in transactions_this_week:
+            # t.created_at.weekday() zwraca 0 dla Pn, 6 dla Nd
+            weekly_xp[t.created_at.weekday()] += t.amount
+
+        # 3. Ostatnie aktywności użytkownika
+        recent = XPTransaction.objects.filter(user=user).order_by('-created_at')[:5]
+        recent_serializer = XPTransactionSerializer(recent, many=True)
+
+        # 4. Lista kamieni milowych z bazy (jeśli pusta, zwracamy domyślne)
+        milestones = Milestone.objects.order_by('level')
+        if not milestones.exists():
+            # Automatyczne uzupełnienie podstawowych progów w bazie przy pierwszym wywołaniu
+            Milestone.objects.bulk_create([
+                Milestone(level=1, title="Nowicjusz", required_xp=0),
+                Milestone(level=2, title="Uczeń", required_xp=250),
+                Milestone(level=3, title="Praktykant", required_xp=750),
+                Milestone(level=4, title="Junior", required_xp=1500),
+                Milestone(level=5, title="Mid", required_xp=3000),
+            ])
+            milestones = Milestone.objects.order_by('level')
+
+        milestones_serializer = MilestoneSerializer(milestones, many=True)
+
+        return Response({
+            "total_xp": total_xp,
+            "weekly_xp": weekly_xp,
+            "recent_activities": recent_serializer.data,
+            "milestones": milestones_serializer.data
+        }, status=status.HTTP_200_OK)

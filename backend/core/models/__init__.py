@@ -8,6 +8,7 @@ from .block import Block
 from .quiz import Quiz
 from .question import Question  # ADD THIS LINE
 from .answer import Answer      # ADD THIS LINE
+from .progress import SectionProgress
 
 # --- Onboarding ---
 from .onboarding import *
@@ -45,4 +46,5 @@ __all__ = [
     'UserBadge',
     'MentorRating',
     'Notification',
+    'SectionProgress'
 ]

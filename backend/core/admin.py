@@ -49,6 +49,21 @@ class CompetencyAdmin(admin.ModelAdmin):
     search_fields = ['name', 'description']
     inlines = [CompetencyCourseInline]
 
+# --- Admin classes for Badges ---
+class BadgeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'course', 'description') 
+    list_filter = ('course__workspace',) 
+    search_fields = ('name', 'description', 'course__title')
+
+class UserBadgeAdmin(admin.ModelAdmin):
+    list_display = ('user', 'badge')
+    list_filter = ('user', 'badge')
+
+class SectionProgressAdmin(admin.ModelAdmin):
+    list_display = ("assignment", "section", "completed")
+    list_filter = ("completed", "assignment__course", "section__course")
+    search_fields = ("assignment__user__username", "assignment__course__title", "section__title")
+
 # Register your models here to see them in the admin UI.
 # This will now work because __init__.py is correctly configured.
 admin.site.register(models.Company)
@@ -65,3 +80,7 @@ admin.site.register(models.OnboardingTemplate)
 admin.site.register(models.Onboarding)
 admin.site.register(models.Competency, CompetencyAdmin)
 admin.site.register(models.CompetencyCourse, CompetencyCourseAdmin)
+admin.site.register(models.Badge, BadgeAdmin)
+admin.site.register(models.UserBadge, UserBadgeAdmin)
+admin.site.register(models.SectionProgress, SectionProgressAdmin)
+admin.site.register(models.MentorRating)

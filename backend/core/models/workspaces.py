@@ -26,12 +26,20 @@ class Workspace(models.Model):
         return self.name
     
 class UserCompany(models.Model):
-        user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="user_company")
-        company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="company_users")
-        role = models.CharField(max_length=50, default="employee")
+    ROLE_CHOICES = [
+        ('employee', 'Pracownik'),
+        ('hr', 'Dział HR'),
+        ('admin', 'Administrator'),
+        ('owner', 'Właściciel'),
+        ('super_admin', 'Super Administrator'),
+    ]
 
-        def __str__(self):
-            return f"{self.user.username} -> {self.company.name}"
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="user_company")
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="company_users")
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default="employee")
+
+    def __str__(self):
+        return f"{self.user.username} -> {self.company.name} ({self.get_role_display()})"
 
 class Invitation(models.Model):
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name="invitations")
